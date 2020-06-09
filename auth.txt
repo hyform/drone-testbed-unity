@@ -1,0 +1,23 @@
+https://www.server.foo/
+user-11
+userpassword
+Hyform Team 1
+true
+false
+true
+
+// ----------------
+// - URL
+// - user
+// - password
+// - team
+// - isBusiness
+// - logToServer
+// - ai
+
+// Everything after the first 7 lines is ignored
+// so you can store notes and stuff down here
+
+// for isBusiness and logToServer, anything that's
+// not 'true' is considered false, so for example
+// 'truex' is false
