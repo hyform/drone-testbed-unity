@@ -41,21 +41,21 @@ namespace DesignerObjects
         /// throttle value for the vehicle
         /// </summary>
         public float throttle;
- 
+
         /// <summary>
         /// PID gains for pitch
         /// </summary>
-        public Vector3 PID_pitch_gains = new Vector3(2, 3, 2); 
+        public Vector3 PID_pitch_gains = new Vector3(2, 3, 2);
 
         /// <summary>
         /// PID gains for roll
         /// </summary>
-        public Vector3 PID_roll_gains = new Vector3(2, 0.2f, 0.5f); 
+        public Vector3 PID_roll_gains = new Vector3(2, 0.2f, 0.5f);
 
         /// <summary>
         /// PID gains for yaw
         /// </summary>
-        public Vector3 PID_yaw_gains = new Vector3(1, 0, 0); 
+        public Vector3 PID_yaw_gains = new Vector3(1, 0, 0);
 
         /// <summary>
         /// PID gains for throttle
@@ -258,6 +258,7 @@ namespace DesignerObjects
             // for each foil
             foreach (GameObject obj in vehicle.foils)
             {
+
                 // gets velocity
                 float v = new Vector3(vehicle.mainPrototypeStructure.GetComponent<Rigidbody>().velocity.x, 0, vehicle.mainPrototypeStructure.GetComponent<Rigidbody>().velocity.z).magnitude;
 
@@ -269,58 +270,23 @@ namespace DesignerObjects
                 // get the area of the foil
                 float area = obj.GetComponent<MeshRenderer>().bounds.size.x * obj.GetComponent<MeshRenderer>().bounds.size.z;
 
-                RaycastHit hit;
-
                 // check for foils and structures in front
                 Vector3 original_pos = obj.GetComponent<Rigidbody>().transform.position;
                 Vector3 original_scale = obj.GetComponent<Rigidbody>().transform.localScale;
-                // offset to start ray to check for obstructions in front
-                float offsetx = 0.75f * original_scale.z / 2f;
-                float offsety = 0.0f;
-                float offsetz = 0.75f * original_scale.z / 2f;
-                float offsetx1 = 5.0f;
-                float offsetz1 = 5.0f;
-                if (original_pos.x < 0)
-                    offsetx1 = -5.0f;
-                if (original_pos.z < 1000)
-                    offsetz1 = -5.0f;
-                Vector3 pos = new Vector3(original_pos.x + offsetx + offsetx1, original_pos.y + offsety, original_pos.z + offsetz + offsetz1); // offset down a little
                 Vector3 forward_dir = vehicle.mainPrototypeStructure.GetComponent<Rigidbody>().transform.forward;
-                // Debug.DrawRay(pos, 100 * forward_dir, Color.green);
+                //Debug.DrawRay(pos, 100 * forward_dir, Color.green);
 
-
-                // check for an obstruction in front
-                bool val = Physics.Raycast(pos, forward_dir, out hit);
-                if (!val)
+                bool addForce = true;
+                RaycastHit[] hits = Physics.RaycastAll(original_pos, forward_dir, 1000);
+                foreach (RaycastHit hit in hits)
                 {
-                    // lift proportional to velcity^2 and area
-                    // using Vector3(0f, 1f, 0f) , foil up direction caused instability
-                    // of vehicle in Unity , need to try and update with foil up direction
-                    Vector3 force = new Vector3(0f, 1f, 0f) * dot * 0.0005f * v * v * area;
-                    obj.GetComponent<Rigidbody>().AddRelativeForce(force);
+                    string name = hit.rigidbody.gameObject.name;
+                    if (name.StartsWith("foil") || name.StartsWith("structure"))
+                        addForce = false;
                 }
-                else
-                {
+                if (addForce)
+                    obj.GetComponent<Rigidbody>().AddRelativeForce(new Vector3(0, 1, 0) * dot * 0.0005f * v * v * area);
 
-                    string name = "";
-                    try
-                    {
-                        name = hit.rigidbody.gameObject.name;
-                    }
-                    catch (System.Exception e)
-                    {
-                        // Don't really care if I don't know what I hit - it doesn't matter
-                    }
-
-                    // if a foil or structure, do not apply lift to the back foil
-                    if (!name.StartsWith("foil") && !name.Contains("structure"))
-                    {
-                        // Debug.Log("foil: " + obj + " obstructs with: " + name);
-                        Vector3 force = new Vector3(0f, 1f, 0f) * dot * 0.0005f * v * v * area;
-                        obj.GetComponent<Rigidbody>().AddRelativeForce(force);
-                    }
-
-                }
             }
 
             // get total avaialble energy
@@ -339,11 +305,12 @@ namespace DesignerObjects
                     totalMotorEnergyUsed += availableForce / 500;
                     AddForceToPropeller(obj, availableForce);
                 }
+
             }
             else if (!hover) // out of energy and traveling 
             {
                 // want baseline to have a velocity of 20 mph which corrsponds to 36.95 Unity units
-                velocity = 0.5418f * new Vector3(vehicle.mainPrototypeStructure.GetComponent<Rigidbody>().velocity.x, 
+                velocity = 0.5418f * new Vector3(vehicle.mainPrototypeStructure.GetComponent<Rigidbody>().velocity.x,
                     0, vehicle.mainPrototypeStructure.GetComponent<Rigidbody>().velocity.z).magnitude;
                 getDistance();
                 analysisEnded = true;
@@ -352,7 +319,7 @@ namespace DesignerObjects
             else // out of energy and hovering
             {
                 // want baseline to have a velocity of 20 mph which corrsponds to 36.95 Unity units
-                velocity = 0.5418f * new Vector3(vehicle.mainPrototypeStructure.GetComponent<Rigidbody>().velocity.x, 
+                velocity = 0.5418f * new Vector3(vehicle.mainPrototypeStructure.GetComponent<Rigidbody>().velocity.x,
                     0, vehicle.mainPrototypeStructure.GetComponent<Rigidbody>().velocity.z).magnitude;
                 getDistance();
                 analysisEnded = true;
@@ -360,7 +327,7 @@ namespace DesignerObjects
             }
 
             // hit or at the same level as the ground plate
-            if (vehicle.mainPrototypeStructure.transform.position.y <= 
+            if (vehicle.mainPrototypeStructure.transform.position.y <=
                 GameObject.Find("teststand").transform.position.y)
             {
                 resultMsg = UAVPhysics.HITBOUNDARY;
