@@ -46,6 +46,7 @@ namespace DataObjects
         /// queue for AI Planner results
         /// </summary>
         public static string aiPlannerResultQueue = null;
+        public static Plan aiPlannerResultQueuePlan = null;
 
         /// <summary>
         /// queue for AI Evaluation results
@@ -56,6 +57,11 @@ namespace DataObjects
         /// stores the market id
         /// </summary>
         public static int market = 0;
+
+        /// <summary>
+        /// store results from the dronebot
+        /// </summary>
+        public static string dronebotqueue = null;
 
         void Start(){}
         
@@ -226,6 +232,41 @@ namespace DataObjects
         }
 
         /// <summary>
+        /// Get Dronebot results
+        /// </summary>
+        /// <param name="question">question to ask dronebot</param>
+        public void GetDronebotVehicles(string question)
+        {
+
+            StartCoroutine(SessionLib.FullWebRequest(GetCentralServiceEndpoint() + "ai/dronebot/", "POST",
+                request =>
+                {
+
+                    // create the log statement
+                    DroneBotObject obj = new DroneBotObject();
+                    obj.input = question;
+                    obj.output = "";
+
+                    string postData = JsonConvert.SerializeObject(obj);
+                    Debug.Log(postData);
+                    request.redirectLimit = 0;
+                    byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(postData);
+                    request.uploadHandler = (UploadHandler)new UploadHandlerRaw(bodyRaw);
+                    request.SetRequestHeader("Content-Type", "application/json");
+
+                },
+                request =>
+                {
+                    Debug.Log(request.downloadHandler.text);
+                    DroneBotObject postData = JsonConvert.DeserializeObject<DroneBotObject>(request.downloadHandler.text);
+                    dronebotqueue = postData.output;
+
+                }));
+
+        }
+
+
+        /// <summary>
         /// posts a log message to the server
         /// </summary>
         /// <param name="logstr">log message to write to the central data logs</param>
@@ -343,26 +384,38 @@ namespace DataObjects
         /// posts a set of vehicles and customers the central service and it returns 
         /// an AI plan result
         /// </summary>
-        /// <param name="xml">input string of vehicle and customer (will convert to a Plan object)</param>
-        public void PostPlanToAIPlanner(string xml)
+        /// <param name="plan">current PLan</param>
+        public void PostPlanToAI(Plan plan)
         {
-            StartCoroutine(SessionLib.FullWebRequest(GetCentralServiceEndpoint() + "ai/ops1/", "POST",
+            StartCoroutine(SessionLib.FullWebRequest(GetCentralServiceEndpoint() + "ai/opsplan/", "POST",
                 request =>
                 {
-                    OpsPlanAIXMLInput b = new OpsPlanAIXMLInput { input = xml };
-                    string postData = JsonConvert.SerializeObject(b);
-                    Debug.Log(postData);
+
+                    // setup planner AI object
+                    OpsPlanAIRun test = new OpsPlanAIRun();
+                    test.input = JsonConvert.SerializeObject(plan);
+                    test.output = "";
+
+                    string postData = JsonConvert.SerializeObject(test);
+                    Debug.Log("planner AI send data : " + postData);
                     request.redirectLimit = 0;
                     byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(postData);
                     request.uploadHandler = (UploadHandler)new UploadHandlerRaw(bodyRaw);
                     request.SetRequestHeader("Content-Type", "application/json");
+
                 },
                 request =>
                 {
-                    Debug.Log(request.downloadHandler.text);
+
                     resultstr = " Return AI Plan : " + getServerResponse(request.responseCode);
-                    OpsPlanAIXMLOutput postData = JsonConvert.DeserializeObject<OpsPlanAIXMLOutput>(request.downloadHandler.text);
-                    aiPlannerResultQueue = postData.output;
+                    string convertResults = request.downloadHandler.text.Replace("True", "true");
+                    convertResults = convertResults.Replace("False", "false");
+                    OpsPlanAIRun aiResults = JsonConvert.DeserializeObject<OpsPlanAIRun>(convertResults);
+
+                    // convert python True to true
+                    string formatted = aiResults.output.Replace("True", "true");
+                    aiPlannerResultQueuePlan = JsonConvert.DeserializeObject<Plan>(formatted);
+
                 }));
         }
 
@@ -547,12 +600,30 @@ namespace DataObjects
         /// <summary>
         /// operations plans AI input object
         /// </summary>
-        private class OpsPlanAIXMLInput
+        private class DroneBotObject
         {
             /// <summary>
             /// xml string of the planner AI input with vehicles and customers
             /// </summary>
             public string input { get; set; }
+
+            public string output { get; set; }
+
+            public bool success { get; set; }
+
+        }
+
+        /// <summary>
+        /// operations plans AI input object
+        /// </summary>
+        private class OpsPlanAIRun
+        {
+            /// <summary>
+            /// xml string of the planner AI input with vehicles and customers
+            /// </summary>
+            public string input { get; set; }
+
+            public string output { get; set; }
 
         }
 

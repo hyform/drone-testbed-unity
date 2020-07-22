@@ -249,6 +249,8 @@ public class BaseDeliveryInterface : MonoBehaviour
     protected void SetupBasePlateAndScale()
     {
 
+        cylinderPrefab = GameObject.Find("path_link");
+
         // adds the ground 
         Vector3 scale = GameObject.Find("groundcube").transform.localScale;
         GameObject.Find("groundcube").transform.localScale = new Vector3((float)(scale.x * (scaleSceneFactor / 2.0)), scale.y, (float)(scale.z * (scaleSceneFactor / 2.0)));
@@ -284,8 +286,6 @@ public class BaseDeliveryInterface : MonoBehaviour
         GameObject.Find("East").transform.position = new Vector3(eastPosition.x * scaleSceneFactor / 2f, eastPosition.y, eastPosition.z);
         Vector3 westPosition = GameObject.Find("West").transform.position;
         GameObject.Find("West").transform.position = new Vector3(westPosition.x * scaleSceneFactor / 2f, westPosition.y, westPosition.z);
-
-        cylinderPrefab = GameObject.Find("Cylinder");
 
     }
 
@@ -416,7 +416,6 @@ public class BaseDeliveryInterface : MonoBehaviour
         planCalculation.calculate();
         planMetricsStr = planCalculation.getInfoString();
         overbudget = planCalculation.getStartupCost() > budget;
-        Capture.Log("PathMetrics;" + planCalculation.getLogString(), business ? Capture.BUSINESS : Capture.PLANNER);
 
     }
 
@@ -744,7 +743,8 @@ public class BaseDeliveryInterface : MonoBehaviour
     protected void RemovePaths()
     {
         selectedPathIndex = -1;
-        plan.paths.Clear();
+        foreach (VehicleDelivery delivery in plan.paths)
+            delivery.customers.Clear();
         RefreshPaths();
         planMetricsStr = "";
         overbudget = false;
@@ -867,12 +867,41 @@ public class BaseDeliveryInterface : MonoBehaviour
     protected void ToggleHouseSelection(GameObject selectedObj, Customer target)
     {
 
-        if (!target.selected) 
-            selectedObj.GetComponent<MeshRenderer>().material.color = Color.black;
-        else if(target.selected && target.payload.StartsWith("food"))
-            selectedObj.GetComponent<MeshRenderer>().material.color = GUIHelpers.REDHOUSE;
+        //if (!target.selected)
+        //    selectedObj.GetComponent<MeshRenderer>().material.color = Color.black;
+        //else if (target.selected && target.payload.StartsWith("food"))
+        //    selectedObj.GetComponent<MeshRenderer>().material.color = GUIHelpers.REDHOUSE;
+        //else
+        //    selectedObj.GetComponent<MeshRenderer>().material.color = GUIHelpers.YELLOWHOUSE;
+
+        GameObject houseObj = null;
+        foreach (Transform tt in selectedObj.transform)
+            foreach (Transform t in tt.transform)
+            {
+                if (t.name.Equals("House"))// Do something to child one
+                    houseObj = t.gameObject;
+            }
+
+        if (houseObj == null)
+            return;
+
+        
+        if (!target.selected)
+        {
+            houseObj.GetComponent<MeshRenderer>().materials[0].color = Color.black;
+            houseObj.GetComponent<MeshRenderer>().materials[1].color = Color.black;
+        }
+        else if (target.selected && target.payload.StartsWith("food"))
+        {
+            houseObj.gameObject.GetComponent<MeshRenderer>().materials[0].color = GUIHelpers.REDHOUSE;
+            houseObj.gameObject.GetComponent<MeshRenderer>().materials[1].color = GUIHelpers.REDHOUSE;
+        }
         else
-            selectedObj.GetComponent<MeshRenderer>().material.color = GUIHelpers.YELLOWHOUSE;
+        {
+            houseObj.gameObject.GetComponent<MeshRenderer>().materials[0].color = GUIHelpers.YELLOWHOUSE;
+            houseObj.gameObject.GetComponent<MeshRenderer>().materials[1].color = GUIHelpers.YELLOWHOUSE;
+        }
+
 
         if (weightLabelMap.ContainsKey(target))
             weightLabelMap[target].GetComponent<MeshRenderer>().enabled = target.selected && toggleWeightLabels;
@@ -901,6 +930,7 @@ public class BaseDeliveryInterface : MonoBehaviour
         setPlanFromPlan(sentPlan);
         AddHouses();
 
+        plan.id = sentPlan.id;
         plan.tag = sentPlan.tag;
         plan.scenario = scenario;
         plan.paths.Clear();
@@ -1089,7 +1119,7 @@ public class BaseDeliveryInterface : MonoBehaviour
 
             try
             {
-                Capture.Log("Opened;" + userSelectedPlan.tag, business ? Capture.BUSINESS : Capture.PLANNER);
+                Capture.Log("Opened;" + JsonConvert.SerializeObject(plan) + ";" + planCalculation.getLogString(), business ? Capture.BUSINESS : Capture.PLANNER);
             }
             catch (Exception e)
             {

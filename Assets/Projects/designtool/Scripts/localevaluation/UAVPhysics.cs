@@ -280,12 +280,18 @@ namespace DesignerObjects
                 RaycastHit[] hits = Physics.RaycastAll(original_pos, forward_dir, 1000);
                 foreach (RaycastHit hit in hits)
                 {
-                    string name = hit.rigidbody.gameObject.name;
-                    if (name.StartsWith("foil") || name.StartsWith("structure"))
-                        addForce = false;
+                    try
+                    {
+                        string name = hit.rigidbody.gameObject.name;
+                        if (name.StartsWith("foil") || name.StartsWith("structure"))
+                            addForce = false;
+                    } catch (System.Exception e)
+                    {
+                        Debug.Log(e);
+                    }
                 }
                 if (addForce)
-                    obj.GetComponent<Rigidbody>().AddRelativeForce(new Vector3(0, 1, 0) * dot * 0.0005f * v * v * area);
+                    obj.GetComponent<Rigidbody>().AddRelativeForce(new Vector3(0,1,0) * dot * 0.0005f * v * v * area);
 
             }
 

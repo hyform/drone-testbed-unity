@@ -305,6 +305,15 @@ namespace DesignerTools
             return aiMap[obj];
         }
 
+        /// <summary>
+        /// gets the metrics of an AI design
+        /// </summary>
+        /// <param name="config"></param>
+        /// <returns>metrics (range, cost, capacity)</returns>
+        public double[] getMetrics(string config)
+        {
+            return aiUavs[config];
+        }
 
         /// <summary>
         /// 

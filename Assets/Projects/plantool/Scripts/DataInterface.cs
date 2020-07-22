@@ -83,17 +83,6 @@ namespace PlannerAssets
             GameObject.Find("restapi").GetComponent<RestWebService>().GetPlan(id);
         }
 
-        /// <summary>
-        /// 
-        /// run the plan AI analysis 
-        /// 
-        /// </summary>
-        /// <param name="input">input string that includes customers and available vehicles</param>
-        public static void runPlanAIAnalysis(string input)
-        {
-            GameObject.Find("restapi").GetComponent<RestWebService>().PostPlanToAIPlanner(input);
-        }
-
     }
 
 }

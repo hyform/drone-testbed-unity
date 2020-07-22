@@ -139,7 +139,17 @@ ModelImporter:
     4300040: Window.015
     4300042: Window.014
     4300044: Window.013
-  externalObjects: {}
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Roof
+    second: {fileID: 2100000, guid: 37b7e176b7b49d941932b1c38a13481e, type: 3}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Siding
+    second: {fileID: 2100000, guid: 37b7e176b7b49d941932b1c38a13481e, type: 3}
   materials:
     importMaterials: 1
     materialName: 0

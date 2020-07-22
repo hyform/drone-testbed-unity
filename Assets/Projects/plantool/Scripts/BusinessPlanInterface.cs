@@ -7,6 +7,7 @@ using System;
 using TMPro;
 using UnityEngine.UI;
 using PlanToolHelpers;
+using Newtonsoft.Json;
 
 /// <summary>
 /// 
@@ -365,7 +366,7 @@ public class BusinessPlanInterface : BaseDeliveryInterface
         fromPlan(planopen);
         ShowMsg("Plan opened: " + plan.tag, false);
         playClick();
-        Capture.Log("Opened;" + planopen.tag, business ? Capture.BUSINESS : Capture.PLANNER);
+        Capture.Log("Opened;" + planopen.tag + ";" + JsonConvert.SerializeObject(plan) + ";" + planCalculation.getLogString(), business ? Capture.BUSINESS : Capture.PLANNER);
     }
 
     /// <summary>
@@ -409,8 +410,7 @@ public class BusinessPlanInterface : BaseDeliveryInterface
                 ToggleHouseSelection(selectedObj, customer);
 
                 playClick();
-
-                Capture.Log("SelectNode;" + customer.id + ";" + customer.selected, business ? Capture.BUSINESS : Capture.PLANNER);
+                Capture.Log("SelectNode;" + customer.id + ";" + customer.selected + ";" + JsonConvert.SerializeObject(plan), business ? Capture.BUSINESS : Capture.PLANNER);
 
             }
 
@@ -433,8 +433,8 @@ public class BusinessPlanInterface : BaseDeliveryInterface
                 Customer customer = (Customer)highlighted[1];
                 Vector3 pos = obj.transform.position;
                 Vector3 scale = obj.transform.localScale;
-                GameObject.Find("customerhighlight").transform.position = new Vector3(pos.x, pos.y + 0.0f, !orthogonalView ? pos.z : pos.z + 0.2f);
-                GameObject.Find("customerhighlight").transform.localScale = new Vector3(1 + customer.weight / 4f, scale.y, 1 + customer.weight / 4f);
+                GameObject.Find("customerhighlight").transform.position = new Vector3(pos.x, 0.02f, !orthogonalView ? pos.z : pos.z);
+                GameObject.Find("customerhighlight").transform.localScale = new Vector3(1 + customer.weight / 4f, 0.01f*scale.y, 1 + customer.weight / 4f);
                 ShowHouseLabel(customer);
             }
 
@@ -700,7 +700,7 @@ public class BusinessPlanInterface : BaseDeliveryInterface
             businessFinalPlanSelected = true;
 
             ShowMsg("Selected Final Plan for Your Team", false);
-            Capture.Log("BusinessPlanSelected:" + plan.tag + ":" + plan.id, business ? Capture.BUSINESS : Capture.PLANNER);
+            Capture.Log("BusinessPlanSelected:" + plan.tag + ";" + plan.id + ";" + JsonConvert.SerializeObject(plan), business ? Capture.BUSINESS : Capture.PLANNER);
 
         }
 

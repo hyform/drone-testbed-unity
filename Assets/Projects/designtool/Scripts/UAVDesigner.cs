@@ -273,6 +273,7 @@ namespace DesignerAssets
         private Rect submitRect = new Rect(340, 180, 100, 25);
         private Rect designModePopopRect = new Rect(224, 180, 100, 25);
         private Rect aiRect = new Rect(128, 100, 28, 28);
+        //private Rect dronebotRect = new Rect(160, 100, 28, 28);
         private Rect dbRect;
         private Rect loadBoxRect = new Rect(0, 0, 1, 1);
 
@@ -283,6 +284,8 @@ namespace DesignerAssets
         /// </summary>
         void Start()
         {
+
+            Application.targetFrameRate = 30;
 
             // set log start time
             Capture.startLogTime();
@@ -467,6 +470,7 @@ namespace DesignerAssets
                 if (submitRect.Contains(Event.current.mousePosition)) tooltipRect = new Rect(submitRect.xMin + 10, submitRect.yMax + 2, 400, submitRect.height);
                 if (designModePopopRect.Contains(Event.current.mousePosition)) tooltipRect = new Rect(designModePopopRect.xMin + 10, designModePopopRect.yMax + 2, 400, designModePopopRect.height);
                 if (aiRect.Contains(Event.current.mousePosition)) tooltipRect = new Rect(aiRect.xMax - 10, aiRect.yMax + 2, 400, aiRect.height);
+                //if (dronebotRect.Contains(Event.current.mousePosition)) tooltipRect = new Rect(dronebotRect.xMax - 10, dronebotRect.yMax + 2, 400, dronebotRect.height);
                 if (loadBoxRect.Contains(Event.current.mousePosition)) tooltipRect = new Rect(loadBoxRect.xMin, loadBoxRect.yMax, loadBoxRect.width, loadBoxRect.height);
                 if (dbRect.Contains(Event.current.mousePosition)) tooltipRect = new Rect(dbRect.xMin - 168, dbRect.yMax + 2, 400, dbRect.height);
             }
@@ -656,6 +660,19 @@ namespace DesignerAssets
 
                 }
             }
+
+            // if the session allows for AI and there is a valid capacity value entered,
+            // show the AI button
+            //if (Startup.droneBot)
+            //{
+            //    if (GUI.Button(dronebotRect, new GUIContent(aiimage, "Dronebot")))
+            //    {
+
+            //        DataInterface.GetDronebotResponse("What vehicles have more range than 20");
+            //        playClick();
+
+            //    }
+            //}
         }
 
         /// <summary>
@@ -1915,14 +1932,7 @@ namespace DesignerAssets
         /// <returns></returns>
         private int getCapacity(string config) 
         {
-            try
-            {
-                return (int)double.Parse(config.Split(',')[1]);
-            } catch (Exception e)
-            {
-                Debug.Log(e);
-                return -1;
-            }
+            return (int)double.Parse(config.Split(',')[1]);
         }
 
         /// <summary>
@@ -2305,7 +2315,10 @@ namespace DesignerAssets
                     string config = aihelper.getSelected(selected);
                     if (config != null)
                     {
-                            
+
+                        // get metrics
+                        double[] metrics = aihelper.getMetrics(config);
+
                         // deactivate AI mode and remove all AI generated designs
                         aiMode = false;
                         aihelper.removeAIGeneratedUAVDisplays();
@@ -2317,7 +2330,10 @@ namespace DesignerAssets
                         // updates the history
                         updateHistory(config);
 
-                        Capture.Log("SelectedAIDesign;" + generatestring(), Capture.DESIGNER);
+                        Capture.Log("SelectedAIDesign;" + generatestring() + 
+                            ";range=" + metrics[0].ToString("0.00") +
+                            ";cost=" + metrics[1].ToString("0") +
+                            ";capacity=" + metrics[2].ToString("0.00"), Capture.DESIGNER);
 
                     }
                 }
@@ -2375,11 +2391,12 @@ namespace DesignerAssets
             // creates the physics analysis code
             physics = new UAVPhysics(prototype);
 
+            // resets the simulation time
+            simTime = 0;
+
             // calculates the cost 
             lastOutput.cost = prototype.getCost();
 
-            // resets the simulation time
-            simTime = 0;
 
         }
 
@@ -2425,6 +2442,12 @@ namespace DesignerAssets
                     // done evaluating
                     evaluating = false;
 
+                    // log data
+                    string config = generatestring();
+                    Capture.Log("Evaluated;" + config + ";range=" + lastOutput.range.ToString("0.00") + ";capacity=" 
+                        + getCapacity(config) + ";cost=" + lastOutput.cost.ToString("0") + ";velocity=" 
+                        + lastOutput.velocity.ToString("0.00"), Capture.DESIGNER);
+
                     // if a regular evaluation run
                     if (!aiRun)
                     {
@@ -2449,6 +2472,8 @@ namespace DesignerAssets
 
                         // set the view to behind the evaluation vehicle
                         ResetViewToEvaluationView();
+
+                        
 
                         // show the results as a popup panel
                         if (physics.resultMsg.Contains("Success"))

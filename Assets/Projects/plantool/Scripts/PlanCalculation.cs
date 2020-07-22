@@ -118,10 +118,10 @@ namespace PlanToolHelpers
 
                 // update customer count and fixed cost 
                 customers += plan.paths[i].customers.Count;
-                startupCost += (int) (plan.paths[i].vehicle.cost);              
+                startupCost += (int) (plan.paths[i].vehicle.cost);
 
             }
-
+            
             // calculate operational cost, profit, and fixed cost
             // 100 is just a constant set to represent a cost per mile  
             operatingCost = (float)(System.Math.Round((double)totalVehicleRange * 100));

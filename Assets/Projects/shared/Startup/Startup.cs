@@ -59,6 +59,11 @@ class Startup
     /// </summary>
     public static bool isAI = false;
 
+    /// <summary>
+    /// flag to include drone bot
+    /// </summary>
+    public static bool droneBot = false;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void OnBeforeSceneLoadRuntimeMethod()
     {
@@ -124,6 +129,16 @@ class Startup
             {
                 Startup.isAI = false;
             }
+
+            //var checkDroneBot = authInfo[7];
+            //if (checkDroneBot == "true")
+            //{
+            //    Startup.droneBot = true;
+            //}
+            //else
+            //{
+            //    Startup.droneBot = false;
+            //}
 
         } else
         {

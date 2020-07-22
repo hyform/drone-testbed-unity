@@ -99,6 +99,7 @@ namespace DesignerObjects
             // this code can be cleaned up using Unity bounds methods
             foreach (GameObject obj in objects)
             {
+
                 Vector3 size = obj.GetComponent<MeshRenderer>().bounds.size;
                 minsize = System.Math.Min(minsize, size.x);
                 minsize = System.Math.Min(minsize, size.y);
@@ -131,7 +132,7 @@ namespace DesignerObjects
             {
                 Vector3 pos = obj.transform.position;
                 Vector3 newPos = new Vector3(scale * pos.x, scale * pos.y + prototypey, scale * pos.z + prototypez);
-
+                
                 GameObject vehicleObject = Instantiate(obj, newPos, obj.transform.rotation) as GameObject;
                 Vector3 localScale = vehicleObject.transform.localScale;
                 vehicleObject.transform.localScale = new Vector3(scale * localScale.x, scale * localScale.y, scale * localScale.z);
@@ -275,7 +276,7 @@ namespace DesignerObjects
             addAllObjects(allObjects, GameObject.FindGameObjectsWithTag(DesignerAssets.UAVDesigner.PROTOTYPEMOTORCW));
             addAllObjects(allObjects, GameObject.FindGameObjectsWithTag(DesignerAssets.UAVDesigner.PROTOTYPECONNECTION));
             addAllObjects(allObjects, GameObject.FindGameObjectsWithTag(DesignerAssets.UAVDesigner.PROTOTYPEFOIL));
-            
+
             // connect all objects and use the main structure as the base connection
             allObjects.Remove(mainPrototypeStructure);
             attachedObjects(connectedObjects, allObjects);

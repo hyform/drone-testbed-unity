@@ -57,7 +57,7 @@ namespace DesignerObjects
         /// number of components added to an assembly (42). if this application does expand to larger
         /// assemblies, this will need to be modified.
         /// </summary>
-        public static char[] nodeIdChars = { 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '!', '@', '#', '$', '%', '&', '(', ')', '_', '=', '[', ']', '{', '}', '<', '>'};
+        public static char[] nodeIdChars = { 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '!', '@', '#', '$', '%', '&', '(', ')', '_', '=', '[', ']', '{', '}', '<', '>', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
 
         /// <summary>
         /// array of characters that identify the positions of nodes in the grammar string, M is the 

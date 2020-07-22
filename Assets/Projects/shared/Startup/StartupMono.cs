@@ -93,9 +93,6 @@ public class StartupMono : MonoBehaviour
         UnityWebRequest request = UnityWebRequest.Post(Startup.baseURL + "api-token-auth/", form);
         request.downloadHandler = new DownloadHandlerBuffer();
 
-        
-
-
         yield return request.SendWebRequest();
         while (!request.downloadHandler.isDone)
         {

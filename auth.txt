@@ -1,4 +1,4 @@
-https://www.server.foo/
+http://localhost:8081/
 user-11
 userpassword
 Hyform Team 1

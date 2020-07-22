@@ -1,6 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.IO;
-using System.Xml;
 using UnityEngine;
 using Assets;
 using PlannerAssets;
@@ -8,6 +6,7 @@ using DataObjects;
 using System;
 using TMPro;
 using PlanToolHelpers;
+using Newtonsoft.Json;
 
 /// <summary>
 /// 
@@ -141,8 +140,7 @@ public class OpsPlanInterface : BaseDeliveryInterface
         {
             playClick();
             RemovePaths();
-            RefreshPaths();
-            Capture.Log("RemoveAllPaths", Capture.PLANNER);
+            Capture.Log("RemoveAllPaths;" + JsonConvert.SerializeObject(plan) + ";" + planCalculation.getLogString(), Capture.PLANNER);
         }
 
         // submit plan button to your team, it will open a popup for confirmation
@@ -271,7 +269,7 @@ public class OpsPlanInterface : BaseDeliveryInterface
 
                     playClick();
 
-                    Capture.Log("VehiclePathRemoved;" + i + ";" + plan.paths[i].vehicle.tag, Capture.PLANNER);
+                    Capture.Log("VehiclePathRemoved;" + i + ";" + plan.paths[i].vehicle.tag + ";" + JsonConvert.SerializeObject(plan) + ";" + planCalculation.getLogString(), Capture.PLANNER);
 
                 }
             }
@@ -287,7 +285,7 @@ public class OpsPlanInterface : BaseDeliveryInterface
                 RefreshPaths();
 
                 playClick();
-                Capture.Log("VehicleRemove;" + i + ";" + vehicletag, Capture.PLANNER);
+                Capture.Log("VehicleRemove;" + i + ";" + vehicletag + ";" + JsonConvert.SerializeObject(plan) + ";" + planCalculation.getLogString(), Capture.PLANNER);
                 ShowMsg(vehicletag + " Removed", false);
 
                 if (plan.paths.Count == 0)
@@ -384,7 +382,7 @@ public class OpsPlanInterface : BaseDeliveryInterface
                     plan.paths.Add(p);
                     RefreshPaths();
                     playClick();
-                    Capture.Log("VehicleAdd;" + vehicle.tag, Capture.PLANNER);
+                    Capture.Log("VehicleAdd;" + vehicle.tag + ";" + JsonConvert.SerializeObject(plan) + ";" + planCalculation.getLogString(), Capture.PLANNER);
                     ShowMsg(vehicle.tag + " Added", false);
 
                 }
@@ -501,8 +499,9 @@ public class OpsPlanInterface : BaseDeliveryInterface
                     }
 
                     // insert the customer
+                    Capture.Log("ManualPathAddedDrag", Capture.PLANNER);
                     insertCustomer(customerId, position);
-                    Capture.Log("ManualPathAddedDrag;VehicleIndex=" + selectedPathIndex + ";AddedIndex=" + position + ";VehicleTag=" + plan.paths[selectedPathIndex].vehicle.tag, Capture.PLANNER);
+
                 }
             
             // cleans up connection drags objects
@@ -547,7 +546,7 @@ public class OpsPlanInterface : BaseDeliveryInterface
                     manualPathCapacityRemaining = pathPathCalculation.getTotalCapacityRemaining();
                     manualPathRangeRemaining = pathPathCalculation.getTotalRangeRemaining();
 
-                    Capture.Log("ManualPathRemove;VehicleIndex=" + selectedPathIndex + ";RemovedIndex=" + customerID + ";VehicleName=" + plan.paths[selectedPathIndex].vehicle.tag, Capture.PLANNER);
+                    Capture.Log("ManualPathRemove;VehicleIndex=" + selectedPathIndex + ";RemovedIndex=" + customerID + ";VehicleName=" + plan.paths[selectedPathIndex].vehicle.tag + ";" + JsonConvert.SerializeObject(plan) + ";" + planCalculation.getLogString(), Capture.PLANNER);
 
                     playClick();
 
@@ -604,8 +603,8 @@ public class OpsPlanInterface : BaseDeliveryInterface
                 {
                     Vector3 pos = obj.transform.position;
                     Vector3 scale = obj.transform.localScale;
-                    GameObject.Find("customerhighlight").transform.position = new Vector3(pos.x, pos.y + 0.0f, !orthogonalView ? pos.z : pos.z + 0.2f);
-                    GameObject.Find("customerhighlight").transform.localScale = new Vector3(1 + customer.weight / 4f, scale.y, 1 + customer.weight / 4f);
+                    GameObject.Find("customerhighlight").transform.position = new Vector3(pos.x, 0.02f, pos.z);
+                    GameObject.Find("customerhighlight").transform.localScale = new Vector3(1 + customer.weight / 4f, 0.01f*scale.y, 1 + customer.weight / 4f);
                     ShowHouseLabel(customer);
                 }
 
@@ -701,9 +700,8 @@ public class OpsPlanInterface : BaseDeliveryInterface
 
                 manualPathCapacityRemaining = planPathCalculation.getTotalCapacityRemaining();
                 manualPathRangeRemaining = planPathCalculation.getTotalRangeRemaining();
-
                 debugStr = "Path updated";
-                Capture.Log("ManualPathAdded;VehicleIndex=" + selectedPathIndex + ";AddedIndex=" + customerId + ";VehicleTag=" + plan.paths[selectedPathIndex].vehicle.tag, Capture.PLANNER);
+                Capture.Log("ManualPathAdded;VehicleIndex=" + selectedPathIndex + ";AddedIndex=" + customerId + ";VehicleTag=" + plan.paths[selectedPathIndex].vehicle.tag + ";" + JsonConvert.SerializeObject(plan) + ";" + planCalculation.getLogString(), Capture.PLANNER);
                 playClick();
 
             }
@@ -752,7 +750,14 @@ public class OpsPlanInterface : BaseDeliveryInterface
     private void runAIAgent()
     {
 
-        bool includedVehicles = plan.paths.Count > 0;
+        // remove memory references
+        string planStr = JsonConvert.SerializeObject(plan);
+        Plan planCopy = JsonConvert.DeserializeObject<Plan>(planStr);
+        // romove all customers
+        foreach (VehicleDelivery delivery in planCopy.paths)
+            delivery.customers.Clear();
+
+        bool includedVehicles = planCopy.paths.Count > 0;
         if (!includedVehicles)
         {
             ShowMsg("No vehicles selected", true);
@@ -762,132 +767,8 @@ public class OpsPlanInterface : BaseDeliveryInterface
         // remove selected path
         selectedPathIndex = -1;
 
-        // still using xml for planner AI input
-        // will change to json objects once server code is updated
-        using (var sw = new StringWriter())
-        {
-            using (var writer = XmlWriter.Create(sw))
-            {
-
-                writer.WriteStartDocument();
-                writer.WriteStartElement("Configuration");
-                List<Customer> targets = scenario.customers;
-                for (int i = 0; i < targets.Count; i++)
-                {
-                    writer.WriteStartElement("Position");
-                    writer.WriteAttributeString("x", "" + targets[i].address.x);
-                    writer.WriteAttributeString("z", "" + targets[i].address.z);
-                    writer.WriteAttributeString("payload", "" + targets[i].weight);
-                    writer.WriteAttributeString("type", targets[i].payload);
-                    writer.WriteAttributeString("selected", "" + targets[i].selected);
-                    writer.WriteEndElement();
-                }
-
-                writer.WriteStartElement("BasePosition");
-                Vector3 p = GameObject.Find("base").transform.position;
-                writer.WriteAttributeString("x", "" + p.x / scaleSceneFactor);
-                writer.WriteAttributeString("z", "" + p.z / scaleSceneFactor);
-                writer.WriteEndElement();
-
-
-                foreach (VehicleDelivery path in plan.paths)
-                {
-                    writer.WriteStartElement("Vehicle");
-                    writer.WriteAttributeString("configuration", path.vehicle.config);
-                    writer.WriteAttributeString("range", "" + path.vehicle.range);
-                    writer.WriteAttributeString("velocity", "" + path.vehicle.velocity);
-                    writer.WriteAttributeString("cost", "" + path.vehicle.cost);
-                    writer.WriteAttributeString("payload", "" + path.vehicle.payload);
-                    writer.WriteAttributeString("quantity", "" + 1);
-                    writer.WriteEndElement();
-                }
-
-                writer.WriteEndElement();
-                writer.WriteEndDocument();
-                writer.Flush();
-                writer.Close();
-            }
-            string input = sw.ToString();
-            DataInterface.runPlanAIAnalysis(input);
-        }
-
-    }
-
-
-    /// <summary>
-    /// 
-    /// parse the string result from the AI Agent (will change to json objects once server code is updated)
-    /// 
-    /// </summary>
-    /// <param name="s"></param>
-    private void parseAIAgentResponse(string s)
-    {
-
-        XmlDocument xDoc = new XmlDocument();
-        xDoc.LoadXml(s);
-
-        XmlNodeList paths = xDoc.GetElementsByTagName("path");
-        XmlNodeList customers = xDoc.GetElementsByTagName("total_customers_satisfied");
-        XmlNodeList total_mass_delivered = xDoc.GetElementsByTagName("total_mass_delivered");
-        XmlNodeList total_vehicle_travel_time = xDoc.GetElementsByTagName("total_vehicle_travel_time");
-        XmlNodeList max_path_duration = xDoc.GetElementsByTagName("max_path_duration");
-        XmlNodeList total_mass = xDoc.GetElementsByTagName("total_mass");
-        XmlNodeList total_mass_package_delivered = xDoc.GetElementsByTagName("total_mass_package_delivered");
-        XmlNodeList total_mass_food1_delivered = xDoc.GetElementsByTagName("total_mass_food1_delivered");
-        XmlNodeList total_mass_food2_delivered = xDoc.GetElementsByTagName("total_mass_food2_delivered");
-
-
-        int customers_value = int.Parse(customers[0].InnerText);
-        int total_mass_delivered_value = int.Parse(total_mass_delivered[0].InnerText);
-        float total_vehicle_travel_time_value = float.Parse(total_vehicle_travel_time[0].InnerText);
-        float max_path_duration_value = float.Parse(max_path_duration[0].InnerText);
-        int total_mass_value = int.Parse(total_mass[0].InnerText);
-        int total_mass_package_delivered_value = int.Parse(total_mass_package_delivered[0].InnerText);
-        int total_mass_food1_delivered_value = int.Parse(total_mass_food1_delivered[0].InnerText);
-        int total_mass_food2_delivered_value = int.Parse(total_mass_food2_delivered[0].InnerText);
-
-        // google ortools code assumes 0 index for the base supply and 1 to N for all node positions
-        Dictionary<int, int> lpIndexMap = new Dictionary<int, int>();
-        for (int i = 1; i < scenario.customers.Count + 1; i++)
-            lpIndexMap[i] = scenario.customers[i - 1].id;
-
-        List<DataObjects.VehicleDelivery> returnPaths = new List<DataObjects.VehicleDelivery>();
-
-        // add vehicle deliveries to the plan based on results from the planner AI
-        for (int i = 0; i < paths.Count; i++)
-        {
-
-            DataObjects.VehicleDelivery vehiclePath = simplePath();
-            vehiclePath.warehouse = scenario.warehouse;
-            vehiclePath.customers = new List<CustomerDelivery>();
-
-            int np = paths[i].ChildNodes.Count;
-            int[] positionsIndex = new int[np + 1];
-            float[] positionTimes = new float[np + 1];
-            for (int j = 0; j < np; j++)
-            {
-
-                int waypointindex = int.Parse(paths[i].ChildNodes[j].InnerText);
-                if (waypointindex != 0)
-                {
-                    CustomerDelivery customer = scenario.getCustomer(lpIndexMap[int.Parse(paths[i].ChildNodes[j].InnerText)]).clone();
-                    customer.deliverytime = float.Parse(paths[i].ChildNodes[j].Attributes["delivered_time"].Value);
-                    vehiclePath.customers.Add(customer);
-                }
-
-            }
-            returnPaths.Add(vehiclePath);
-        }
-
-        int counter = 0;
-        foreach (VehicleDelivery delivery in plan.paths)
-        {
-            delivery.customers = returnPaths[counter].customers;
-            counter += 1;
-        }
-
-        RefreshPaths();
-
+        // send to server
+        GameObject.Find("restapi").GetComponent<RestWebService>().PostPlanToAI(planCopy);
 
     }
 
@@ -932,7 +813,7 @@ public class OpsPlanInterface : BaseDeliveryInterface
                 {
                     plan.tag = planTag;
                     DataInterface.PostPlan(plan);
-                    Capture.Log("SubmitPlanToDB;" + planTag + ":" + plan.tag, Capture.PLANNER);
+                    Capture.Log("SubmitPlanToDB;" + planTag + ";" + JsonConvert.SerializeObject(plan) + ";" + planCalculation.getLogString(), Capture.PLANNER);
                 } else if (tooLong)
                 {
                     ShowMsg("Plan name is too long", true);
@@ -953,14 +834,17 @@ public class OpsPlanInterface : BaseDeliveryInterface
     }
 
     protected override void checkServerCacheCustom() {
-        
+
         // checks for AI Plan results
-        if (RestWebService.aiPlannerResultQueue != null)
+        if (RestWebService.aiPlannerResultQueuePlan != null)
         {
-            string s = RestWebService.aiPlannerResultQueue + "";
-            parseAIAgentResponse(s);
-            RestWebService.aiPlannerResultQueue = null;
+            string planData = JsonConvert.SerializeObject(RestWebService.aiPlannerResultQueuePlan);
+            Plan sentPlan = JsonConvert.DeserializeObject<Plan>(planData);
+            fromPlan(sentPlan);
+            RestWebService.aiPlannerResultQueuePlan = null;
+            Capture.Log("PathAgentResult;" + JsonConvert.SerializeObject(plan), Capture.PLANNER);
         }
+
 
     }
 

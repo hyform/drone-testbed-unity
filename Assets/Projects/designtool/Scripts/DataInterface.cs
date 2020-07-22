@@ -64,6 +64,14 @@ namespace DesignerAssets
             GameObject.Find("restapi").GetComponent<RestWebService>().GetAIVehicles(range, cost, capacity);
         }
 
+        /// <summary>
+        /// get dronebot answer
+        /// </summary>
+        /// <param name="question">question to dronebot</param>
+        public static void GetDronebotResponse(string question)
+        {
+            GameObject.Find("restapi").GetComponent<RestWebService>().GetDronebotVehicles(question);
+        }
 
     }
 
