@@ -410,7 +410,7 @@ public class BusinessPlanInterface : BaseDeliveryInterface
                 ToggleHouseSelection(selectedObj, customer);
 
                 playClick();
-                Capture.Log("SelectNode;" + customer.id + ";" + customer.selected + ";" + JsonConvert.SerializeObject(plan), business ? Capture.BUSINESS : Capture.PLANNER);
+                Capture.Log("SelectNode;Index=" + customer.id + ";Selected=" + customer.selected + ";Position=" + customer.address.x + "," + customer.address.z + ";" + JsonConvert.SerializeObject(plan), business ? Capture.BUSINESS : Capture.PLANNER);
 
             }
 
@@ -688,7 +688,7 @@ public class BusinessPlanInterface : BaseDeliveryInterface
             GUIAssets.PopupButton.submitScenario = false;
             scenario.tag = scenarioLevel + "";
             DataInterface.PostScenario(scenario);
-            Capture.Log("SubmitScenario", business ? Capture.BUSINESS : Capture.PLANNER);
+            Capture.Log("SubmitScenario;" + JsonConvert.SerializeObject(scenario), business ? Capture.BUSINESS : Capture.PLANNER);
         }
 
         // Business : submit a final plan

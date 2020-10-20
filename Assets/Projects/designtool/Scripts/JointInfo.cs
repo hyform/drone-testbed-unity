@@ -224,10 +224,22 @@ namespace DesignerObjects
         /// ex. *bNM2+++</returns>
         public String grammar()
         {
-            return "*" + nodeIdChars[index] 
-                + "" + getPositionChar((int)System.Math.Round(x)) 
-                + "" + getPositionChar((int)System.Math.Round(z)) 
-                + "" + (int)componentType + "" 
+
+            if (index >= nodeIdChars.Length)
+                throw new Exception("Too many components added to the assembly");
+
+            int xPos = (int)System.Math.Round(x);
+            int zPos = (int)System.Math.Round(z);
+
+            if (xPos + 12 >= positionChars.Length)
+                throw new Exception("Assembly structure extends to long");
+            if (zPos + 12 >= positionChars.Length)
+                throw new Exception("Assembly structure extends to long");
+
+            return "*" + nodeIdChars[index]
+                + "" + getPositionChar(xPos)
+                + "" + getPositionChar(zPos)
+                + "" + (int)componentType + ""
                 + getSizeString(sizedata);
         }
 

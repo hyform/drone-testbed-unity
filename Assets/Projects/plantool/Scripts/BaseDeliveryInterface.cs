@@ -480,7 +480,7 @@ public class BaseDeliveryInterface : MonoBehaviour
     {
         DatabaseLoadAllObjects();
         playClick();
-        Capture.Log("Auto LoadDatabase", business ? Capture.BUSINESS : Capture.PLANNER);
+        Capture.Log("AutoLoadDatabase", business ? Capture.BUSINESS : Capture.PLANNER);
     }
 
     /// <summary>
@@ -1050,7 +1050,7 @@ public class BaseDeliveryInterface : MonoBehaviour
             // update house display
             SetHouseAndLabelDisplay();
 
-            Capture.Log("ScenarioLoaded:" + scenario.id, business ? Capture.BUSINESS : Capture.PLANNER);
+            Capture.Log("ScenarioLoaded:" + JsonConvert.SerializeObject(scenario), business ? Capture.BUSINESS : Capture.PLANNER);
 
         }
 

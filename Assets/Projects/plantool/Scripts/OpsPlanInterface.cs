@@ -285,7 +285,7 @@ public class OpsPlanInterface : BaseDeliveryInterface
                 RefreshPaths();
 
                 playClick();
-                Capture.Log("VehicleRemove;" + i + ";" + vehicletag + ";" + JsonConvert.SerializeObject(plan) + ";" + planCalculation.getLogString(), Capture.PLANNER);
+                Capture.Log("VehicleRemoved;" + i + ";" + vehicletag + ";" + JsonConvert.SerializeObject(plan) + ";" + planCalculation.getLogString(), Capture.PLANNER);
                 ShowMsg(vehicletag + " Removed", false);
 
                 if (plan.paths.Count == 0)
@@ -499,7 +499,7 @@ public class OpsPlanInterface : BaseDeliveryInterface
                     }
 
                     // insert the customer
-                    Capture.Log("ManualPathAddedDrag", Capture.PLANNER);
+                    Capture.Log("ManualPathAddedDrag;AfterCustomerIndex=" + position, Capture.PLANNER);
                     insertCustomer(customerId, position);
 
                 }
@@ -536,6 +536,16 @@ public class OpsPlanInterface : BaseDeliveryInterface
                 if (pathindex != -1)
                 {
 
+                    string position = "";
+                    try
+                    {
+                        Address address = plan.paths[selectedPathIndex].customers[pathindex].address;
+                        position += address.x + "," + address.z;
+                    } catch (Exception e)
+                    {
+                        Debug.Log(e);
+                    }
+
                     // remove the customer
                     plan.paths[selectedPathIndex].customers.RemoveAt(pathindex);
                     RefreshPaths();
@@ -546,7 +556,7 @@ public class OpsPlanInterface : BaseDeliveryInterface
                     manualPathCapacityRemaining = pathPathCalculation.getTotalCapacityRemaining();
                     manualPathRangeRemaining = pathPathCalculation.getTotalRangeRemaining();
 
-                    Capture.Log("ManualPathRemove;VehicleIndex=" + selectedPathIndex + ";RemovedIndex=" + customerID + ";VehicleName=" + plan.paths[selectedPathIndex].vehicle.tag + ";" + JsonConvert.SerializeObject(plan) + ";" + planCalculation.getLogString(), Capture.PLANNER);
+                    Capture.Log("ManualPathRemove;VehicleIndex=" + selectedPathIndex + ";RemovedIndex=" + customerID + ";RemovedPosition=" + position + ";VehicleName=" + plan.paths[selectedPathIndex].vehicle.tag + ";" + JsonConvert.SerializeObject(plan) + ";" + planCalculation.getLogString(), Capture.PLANNER);
 
                     playClick();
 
@@ -696,12 +706,23 @@ public class OpsPlanInterface : BaseDeliveryInterface
             if (planPathCalculation.isValid())
             {
 
+                string addedposition = "";
+                try
+                {
+                    Address addedAddress = customerPath.address;
+                    addedposition += addedAddress.x + "," + addedAddress.z;
+                }
+                catch (Exception e)
+                {
+                    Debug.Log(e);
+                }
+
                 RefreshPaths();
 
                 manualPathCapacityRemaining = planPathCalculation.getTotalCapacityRemaining();
                 manualPathRangeRemaining = planPathCalculation.getTotalRangeRemaining();
                 debugStr = "Path updated";
-                Capture.Log("ManualPathAdded;VehicleIndex=" + selectedPathIndex + ";AddedIndex=" + customerId + ";VehicleTag=" + plan.paths[selectedPathIndex].vehicle.tag + ";" + JsonConvert.SerializeObject(plan) + ";" + planCalculation.getLogString(), Capture.PLANNER);
+                Capture.Log("ManualPathAdded;VehicleIndex=" + selectedPathIndex + ";AddedIndex=" + customerId + ";AddedPosition=" + addedposition + ";VehicleTag=" + plan.paths[selectedPathIndex].vehicle.tag + ";" + JsonConvert.SerializeObject(plan) + ";" + planCalculation.getLogString(), Capture.PLANNER);
                 playClick();
 
             }

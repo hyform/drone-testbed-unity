@@ -7955,15 +7955,13 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'Select design using button with id
+  m_text: 'Add designs using vehicle dashboard
 
-    Hover over button to see design''s metrics located below
+    Hover over button to see design''s metrics
 
-    Toggle adds or removes design in the analysis
+    Toggle removes design in the analysis
 
     Bar heights represent a design''s range, capacity, and cost
-
-    Copy button duplicates a design
 
     Trash button removes the design''s path'
   m_isRightToLeft: 0

@@ -138,6 +138,11 @@ namespace DesignerAssets
         public static bool aiMode = false;
 
         /// <summary>
+        /// saves the last result into a string 
+        /// </summary>
+        private string resultMessage = "";
+
+        /// <summary>
         /// string to display in the bottom log display
         /// </summary>
         private string bottomLogString = "";
@@ -566,6 +571,7 @@ namespace DesignerAssets
                     // runServerEvaluation();
                     runLocalEvaluation();
                     Capture.Log("Evaluate;" + generatestring(), Capture.DESIGNER);
+                    ShowMsg("Evaluating ...", false);
                     playClick();
 
                 }
@@ -866,15 +872,15 @@ namespace DesignerAssets
                 {
  
                     GameObject selected = hitInfo.transform.gameObject;
-                    string result = leftClickSelected(selected);
+                    string[] result = leftClickSelected(selected);
 
                     // if change in assembly
                     if (!result.Equals(NOEVENT))
                     {
                         string s = generatestring();
                         updateHistory(s);
-                        Capture.Log("MouseClick;" + result + ";" + s, Capture.DESIGNER);
                         playClick();
+                        Capture.Log("MouseClick;" + result[0] + ";" + s + ";" + result[1], Capture.DESIGNER);
                     }
 
                 }
@@ -901,8 +907,8 @@ namespace DesignerAssets
 
                     string s = generatestring();
                     updateHistory(s);
-                    Capture.Log((Input.GetMouseButtonDown(1) ? "ScaleUp;" : "HotKeyScaleUp;") + s, Capture.DESIGNER);
                     playClick();
+                    Capture.Log((Input.GetMouseButtonDown(1) ? "ScaleUp;" : "HotKeyScaleUp;") + s + ";" + getJointPositionStr(selected), Capture.DESIGNER);
                 }
             }
 
@@ -918,8 +924,9 @@ namespace DesignerAssets
 
                     string s = generatestring();
                     updateHistory(s);
-                    Capture.Log((Input.GetKeyDown(KeyCode.DownArrow) ? "HotKeyScaleDown;" : "ScaleDown;") + s, Capture.DESIGNER);
                     playClick();
+                    Capture.Log((Input.GetKeyDown(KeyCode.DownArrow) ? "HotKeyScaleDown;" : "ScaleDown;") + s + ";" + getJointPositionStr(selected), Capture.DESIGNER);
+                    
                 }
             }
 
@@ -970,11 +977,11 @@ namespace DesignerAssets
 
                         changeJointToComponent(selected, comptype);
 
-                        string s = generatestring();
-                        Capture.Log(logInfo + ";" + comptype.ToString() + ";" + s, Capture.DESIGNER);
-                        updateHistory(s);
-            
                         playClick();
+
+                        string s = generatestring();
+                        Capture.Log(logInfo + ";" + comptype.ToString() + ";" + s + ";" + getJointPositionStr(selected), Capture.DESIGNER);
+                        updateHistory(s);
 
                     }
                 }
@@ -991,17 +998,18 @@ namespace DesignerAssets
                     GameObject selected = hitInfo.transform.gameObject;
                     if (selected) { 
 
-                    // if mouse is over a joint
-                    if (selected.name.StartsWith(JOINT))
-                    {
-                        // hide the results panel
-                        GameObject.Find(POPUPRESULTSPANEL).GetComponent<Canvas>().enabled = false;
+                        // if mouse is over a joint
+                        if (selected.name.StartsWith(JOINT))
+                        {
+                            // hide the results panel
+                            GameObject.Find(POPUPRESULTSPANEL).GetComponent<Canvas>().enabled = false;
 
-                        // change joint component to empty
-                        changeJointToComponent(selected, JointInfo.UAVComponentType.None);
-                        Capture.Log("RemovedComponent;" + generatestring(), Capture.DESIGNER);
-                        playClick();
-                    }
+                            // change joint component to empty
+                            changeJointToComponent(selected, JointInfo.UAVComponentType.None);
+                            playClick();
+                            Capture.Log("RemovedComponent;" + generatestring() + ";" + getJointPositionStr(selected), Capture.DESIGNER);
+
+                        }
 
                         // delete connector 
                         if (selected.name.StartsWith(CONNECTION))
@@ -1047,6 +1055,7 @@ namespace DesignerAssets
                                     bottomLogString = "Removed component";
                                 }
 
+                                string position = "";
                                 // reactivate handle associated with this connection and make it visible
                                 GameObject reactivateHandle = null;
                                 foreach (GameObject key in jointHandleToConnection.Keys)
@@ -1055,6 +1064,13 @@ namespace DesignerAssets
                                     {
                                         key.SetActive(true);
                                         reactivateHandle = key;
+                                        try
+                                        {
+                                            position = getJointPositionStr(key.transform.parent.gameObject) + "," + key.name;
+                                        } catch (Exception e)
+                                        {
+                                            Debug.Log(e);
+                                        }
                                     }
                                 }
 
@@ -1069,7 +1085,7 @@ namespace DesignerAssets
                                 reorderJoints();
 
                                 string s = generatestring();
-                                Capture.Log("RemovedConnector;" + s, Capture.DESIGNER);
+                                Capture.Log("RemovedConnector;" + s + ";" + position, Capture.DESIGNER);
                                 bottomLogString = "Removed connector";
                                 updateHistory(s);
 
@@ -1166,10 +1182,11 @@ namespace DesignerAssets
         /// </summary>
         /// <param name="joint">Unity game object of a joint</param>
         /// <param name="compType">component type</param>
-        private string changeJointToComponent(GameObject joint, JointInfo.UAVComponentType compType)
+        private string[] changeJointToComponent(GameObject joint, JointInfo.UAVComponentType compType)
         {
 
             string typeAction = "";
+            string position = getJointPositionStr(joint);
 
             // get previous size
             int previousSize = jointGraph[joint].sizedata;
@@ -1262,8 +1279,25 @@ namespace DesignerAssets
 
             }
 
-            return typeAction;
+            return new string[] { typeAction, position };
 
+        }
+
+
+        private string getJointPositionStr(GameObject joint)
+        {
+            string position = "";
+            try
+            {
+                float x = jointGraph[joint].x;
+                float z = jointGraph[joint].z;
+                position = JointInfo.getPositionChar((int)x) + "" + JointInfo.getPositionChar((int)z);
+            }
+            catch (Exception e)
+            {
+                Debug.Log(e);
+            }
+            return position;
         }
 
         /// <summary>
@@ -1273,15 +1307,17 @@ namespace DesignerAssets
         /// </summary>
         /// <param name="selected">Unity game object of the selected handle</param>
         /// <returns></returns>
-        private string addConnectorAtHandle(GameObject selected)
+        private string[] addConnectorAtHandle(GameObject selected)
         {
             Vector3 pos = selected.transform.position;
+            string handleInfo = getJointPositionStr(selected.transform.parent.gameObject);
 
             if (selected.name.Equals(POSITIVEZ))
             {
                 Vector3 endPoint = new Vector3(pos.x, pos.y, -jointSize / 2.0f + pos.z + connectionSize);
                 Vector3 startPoint = new Vector3(pos.x, pos.y, -jointSize / 2.0f + pos.z);
                 addConnector(selected, endPoint, startPoint, 0f, 0f, 1f);
+                handleInfo += ",posz";
             }
 
             if (selected.name.Equals(POSITIVEX))
@@ -1289,6 +1325,7 @@ namespace DesignerAssets
                 Vector3 endPoint = new Vector3(-jointSize / 2.0f + pos.x + connectionSize, pos.y, pos.z);
                 Vector3 startPoint = new Vector3(-jointSize / 2.0f + pos.x, pos.y, pos.z);
                 addConnector(selected, endPoint, startPoint, 90f, 0f, 1f);
+                handleInfo += ",posx";
             }
 
             if (selected.name.Equals(NEGATIVEZ))
@@ -1296,6 +1333,7 @@ namespace DesignerAssets
                 Vector3 endPoint = new Vector3(pos.x, pos.y, jointSize / 2.0f + pos.z - connectionSize);
                 Vector3 startPoint = new Vector3(pos.x, pos.y, jointSize / 2.0f + pos.z);
                 addConnector(selected, endPoint, startPoint, 180f, 0f, 1f);
+                handleInfo += ",negz";
             }
 
             if (selected.name.Equals(NEGATIVEX))
@@ -1303,10 +1341,11 @@ namespace DesignerAssets
                 Vector3 endPoint = new Vector3(jointSize / 2.0f + pos.x - connectionSize, pos.y, pos.z);
                 Vector3 startPoint = new Vector3(jointSize / 2.0f + pos.x, pos.y, pos.z);
                 addConnector(selected, endPoint, startPoint, -90f, 0f, 1f);
+                handleInfo += ",negx";
             }
 
             bottomLogString = "Assembly change";
-            return "AssemblyHandle";
+            return new string[] { "AssemblyChange", handleInfo };
 
         }
 
@@ -1317,17 +1356,17 @@ namespace DesignerAssets
         /// 
         /// </summary>
         /// <param name="selected">selected Unity game object</param>
-        private string leftClickSelected(GameObject selected)
+        private string[] leftClickSelected(GameObject selected)
         {
 
-            string typeAction = NOEVENT;
+            string[] typeAction = new string[] { NOEVENT, "" };
 
             // check for left click on joint handle
             if (selected.name.StartsWith(JOINT))
             {
                 JointInfo.UAVComponentType componentType = JointInfo.getNextComponentType(jointGraph[selected].componentType);
-                typeAction = "ToggleComponent";
-                changeJointToComponent(selected, componentType);
+                typeAction[0] = "ToggleComponent";
+                typeAction = changeJointToComponent(selected, componentType);
             }
             // check for left click on assembly handle
             else if (selected.name.Equals(POSITIVEZ) ||
@@ -1518,12 +1557,13 @@ namespace DesignerAssets
                     JointInfo.UAVComponentType compType = (JointInfo.UAVComponentType)type;
                     changeJointToComponent(selected, compType);
 
+                    playClick();
+
                     // add to log
                     string s = generatestring();
-                    Capture.Log("DragComponent;" + compType.ToString() + ";" + s, Capture.DESIGNER);
+                    Capture.Log("DragComponent;" + compType.ToString() + ";" + s + ";" + getJointPositionStr(selected), Capture.DESIGNER);
                     updateHistory(s);
 
-                    playClick();
 
                 }
             }
@@ -1959,25 +1999,37 @@ namespace DesignerAssets
         private string generatestring()
         {
 
-            string str = "";
-
-            // components
-            foreach (GameObject handle in jointGraph.Keys)
+            try
             {
-                JointInfo jointinfo = jointGraph[handle];
-                str += jointinfo.grammar();
-            }
 
-            // connections
-            foreach (GameObject handle in connectionGraph.Keys)
+                string str = "";
+
+                // components
+                foreach (GameObject handle in jointGraph.Keys)
+                {
+                    JointInfo jointinfo = jointGraph[handle];
+                    str += jointinfo.grammar();
+                }
+
+                // connections
+                foreach (GameObject handle in connectionGraph.Keys)
+                {
+                    ConnectorInfo connectioninfo = connectionGraph[handle];
+                    str += connectioninfo.grammar();
+                }
+
+                // original grammar allowed for different controllers
+                // currently setting to custom or fixed 3
+                return str + "," + capacityStr + ",3";
+
+            }
+            catch (Exception e)
             {
-                ConnectorInfo connectioninfo = connectionGraph[handle];
-                str += connectioninfo.grammar();
+                ShowMsg(e.Message, true);
+                fromstring(history[historyIndex]);
+                Capture.Log(e.Message, Capture.DESIGNER);
+                return history[historyIndex];
             }
-
-            // original grammar allowed for different controllers
-            // currently setting to custom or fixed 3
-            return str + "," + capacityStr + ",3";
 
         }
 
@@ -2480,14 +2532,15 @@ namespace DesignerAssets
                         {
                             successfulRun = true;
                             int capacity = getCapacity(lastOutput.config);
-                            string resultMessage = GetResults(lastOutput.result, "\n", lastOutput.range, capacity,
+                            resultMessage = GetResults(lastOutput.result, "\n", lastOutput.range, capacity,
                                 UAVDesigner.getShockCost(lastOutput.cost), lastOutput.velocity, null);
                             bottomLogString = GetResults("Last Run", " : ", lastOutput.range, capacity, UAVDesigner.getShockCost(lastOutput.cost), lastOutput.velocity, null); ;
-                            ShowMsg(resultMessage, false);
+                            ShowMsg("Showing Trajectory : " + resultMessage, false);
                         }
                         else
                         {
-                            ShowMsg(physics.resultMsg, true);
+                            resultMessage = physics.resultMsg;
+                            ShowMsg("Showing Trajectory ...", true);
                         }
                     }
                     else   // AI run
@@ -2597,6 +2650,19 @@ namespace DesignerAssets
 
             // increment index
             evaluationTrajectoryIndex += 1;
+
+            // remove evaluation vehicle after it reaches the end of the trajectory
+            if (evaluationTrajectoryIndex >= lastOutput.trajectory.Count)
+            {
+                GameObject evaluationVehicle = GameObject.Find("EvaluationVehicle");
+                if (evaluationVehicle != null)
+                {
+                    Destroy(GameObject.Find("EvaluationVehicle"));
+                    ShowMsg(resultMessage, !resultMessage.Contains("Success"));
+                }
+                return;
+            }
+                
             // if reached the end, show the last position
             evaluationTrajectoryIndex = Math.Min(evaluationTrajectoryIndex, lastOutput.trajectory.Count - 1);
 
@@ -2612,6 +2678,23 @@ namespace DesignerAssets
             if (lastOutput.result.Contains("Success") || evaluationTrajectoryIndex < 2)
                 Camera.main.transform.LookAt(nextPosition);
 
+
+        }
+
+        private string getMetaComponentData(GameObject obj)
+        {
+            string metaData = "";
+            try
+            {
+                //float x = jointGraph[obj].x;
+                //float z = jointGraph[obj].z;
+                //metaData += JointInfo.getPositionChar((int)x);
+                //metaData += JointInfo.getPositionChar((int)z);
+            } catch (Exception e)
+            {
+                Debug.Log(e);
+            }
+            return metaData;
         }
 
 
