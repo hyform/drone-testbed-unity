@@ -57,7 +57,7 @@ public class OpsPlanInterface : BaseDeliveryInterface
     /// toggle that stores the visibility of the dashboard list of team vehicles
     /// 
     /// </summary>
-    protected bool vehicleDashboardView = true;
+    protected bool vehicleDashboardView = false;
 
     /// <summary>
     /// stores the Remove All Paths rectangular box for tooltip display 
@@ -122,7 +122,21 @@ public class OpsPlanInterface : BaseDeliveryInterface
             bool loaded = (loadedPlans[id].plan != null);
             string tag = (!loaded ? " *" : "") + loadedPlans[id].tag;
             GUI.color = loaded ? Color.white : Color.gray;
-            if (GUI.Button(new Rect(0, 10 + 20 * counter, 164, 20), tag))
+
+            string tooltipLabel = "Select To Open Plan\ntag : " + tag;
+            if (cachedOpen.ContainsKey(id))
+            {
+                tooltipLabel = "Select To Open Plan\ntag : " + tag + "\nprofit=" + cachedOpen[id][0] + "\ncost=" + cachedOpen[id][1] + "\ncustomers=" + cachedOpen[id][2];
+            }
+
+            // add button to open a design
+            if (loadedPlans[id].plan != null)
+                if (!loadedPlans[id].plan.valid)
+                {
+                    GUI.color = new Color(1.0f, 0.4f, 0.0f);
+                }
+
+            if (GUI.Button(new Rect(0, 10 + 20 * counter, 164, 20), new GUIContent(tag, tooltipLabel)))
             {
                 if (loaded)
                 {
@@ -150,19 +164,43 @@ public class OpsPlanInterface : BaseDeliveryInterface
 
             // check that the plan has delivery customers
             int totalCustomers = 0;
-            foreach(DataObjects.VehicleDelivery p in plan.paths)
+            bool valid = true;
+            foreach (DataObjects.VehicleDelivery p in plan.paths)
+            {
                 totalCustomers += p.customers.Count;
-            
-            // open popup
-            if (totalCustomers > 0)
-            {
-                GUIAssets.PopupButton.showing = true;
-                GUIAssets.PopupButton.popupPanelID = "SubmitCanvas";
-                GameObject.Find("SubmitCanvas").GetComponent<Canvas>().enabled = true;
+                PlanPathCalculation planPathCalculation = new PlanPathCalculation(p);
+                planPathCalculation.calculate();
+                if (planPathCalculation.isRestrictedAirSpace())
+                    valid = false;
             }
-            else
+
+            if (valid)
             {
-                ShowMsg("Empty Plan", true);
+                // open popup
+                if (totalCustomers > 0)
+                {
+
+                    PlanCalculation planalc = new PlanCalculation(plan, scaleSceneFactor, business);
+                    planalc.calculate();
+
+                    GUIAssets.PopupButton.showing = true;
+                    GUIAssets.PopupButton.popupPanelID = "SubmitCanvas";
+                    GameObject.Find("SubmitCanvas").GetComponent<Canvas>().enabled = true;
+
+                    GameObject.Find("InputTag").GetComponent<TMP_InputField>().text = "p" + (int) planalc.getProfit() + "_$" + (int)planalc.getStartupCost() + "_c" + (int)planalc.getCustomers();
+
+
+                    if (tutorialStep == 7)
+                        toggleTutorial();
+
+                }
+                else
+                {
+                    ShowMsg("Empty Plan", true);
+                }
+            } else
+            {
+                ShowMsg("Plan Goes throught Restricted Airspace", true);
             }
 
         }
@@ -176,6 +214,7 @@ public class OpsPlanInterface : BaseDeliveryInterface
                 vehicleDashboardView = false;
                 runAIAgent();
                 Capture.Log("RunPathAgent", Capture.PLANNER);
+
             }
         }
 
@@ -227,6 +266,9 @@ public class OpsPlanInterface : BaseDeliveryInterface
                 playClick();
                 Capture.Log("SelectPath;" + i + ";" + vehicletag, Capture.PLANNER);
 
+                if (tutorialStep == 4)
+                    toggleTutorial();
+
             }
 
             // draw vehicle metrics as bar charts
@@ -271,6 +313,9 @@ public class OpsPlanInterface : BaseDeliveryInterface
 
                     Capture.Log("VehiclePathRemoved;" + i + ";" + plan.paths[i].vehicle.tag + ";" + JsonConvert.SerializeObject(plan) + ";" + planCalculation.getLogString(), Capture.PLANNER);
 
+                    if (tutorialStep == 11)
+                        toggleTutorial();
+
                 }
             }
 
@@ -290,6 +335,9 @@ public class OpsPlanInterface : BaseDeliveryInterface
 
                 if (plan.paths.Count == 0)
                     vehicleDashboardView = true;
+
+                if (tutorialStep == 12)
+                    toggleTutorial();
 
             }
 
@@ -336,13 +384,27 @@ public class OpsPlanInterface : BaseDeliveryInterface
 
         // add a button to toggle the information help panel
         vehicleSelectionRect = new Rect(244, 52, 28, 28);
-        if (GUI.Button(vehicleSelectionRect, new GUIContent(GUIHelpers.dashboardimage, "Add a Design From the Design Team")))
+
+        Texture2D imageicon = GUIHelpers.dashboardimage;
+        //if (tutorialStep == 1 || tutorialStep == 3)
+        //{
+        //    imageicon = GUIHelpers.dashboardimagehighlight;
+        //} 
+
+        if (GUI.Button(vehicleSelectionRect, new GUIContent(imageicon, "Add a Design From the Design Team")))
         {
             vehicleDashboardView = !vehicleDashboardView;
             if (vehicleDashboardView)
                 selectedPathIndex = -1;
             playClick();
             Capture.Log("ShowVehicleList;" + vehicleDashboardView, Capture.PLANNER);
+
+            if (vehicleDashboardView && tutorialStep == 1)
+                toggleTutorial();
+
+            if (!vehicleDashboardView && tutorialStep == 3)
+                toggleTutorial();
+
         }
 
         // add the team design selection list
@@ -385,6 +447,9 @@ public class OpsPlanInterface : BaseDeliveryInterface
                     Capture.Log("VehicleAdd;" + vehicle.tag + ";" + JsonConvert.SerializeObject(plan) + ";" + planCalculation.getLogString(), Capture.PLANNER);
                     ShowMsg(vehicle.tag + " Added", false);
 
+                    if (tutorialStep == 2)
+                        toggleTutorial();
+
                 }
 
                 // add the vehicle tag
@@ -403,8 +468,12 @@ public class OpsPlanInterface : BaseDeliveryInterface
             GUI.EndScrollView();
 
             // add the hide button at the bottom of the view
-            if (GUI.Button(new Rect(250, 456, 140, 28), "Hide"))           
+            if (GUI.Button(new Rect(250, 456, 140, 28), "Hide"))
+            {
                 vehicleDashboardView = false;
+                if (tutorialStep == 3)
+                    toggleTutorial();
+            }
             
         }
 
@@ -415,7 +484,7 @@ public class OpsPlanInterface : BaseDeliveryInterface
     }
 
     protected override void tooltipDisplay() {
-        if (teamPlansRect.Contains(Event.current.mousePosition)) tooltipRect = new Rect(teamPlansRect.xMin - 140, 100, 400, 40);
+        if (teamPlansRect.Contains(Event.current.mousePosition)) tooltipRect = new Rect(teamPlansRect.xMin - 140, 100, 400, 200);
         if (aiButtonRect.Contains(Event.current.mousePosition)) tooltipRect = new Rect(aiButtonRect.xMax, aiButtonRect.yMin - aiButtonRect.height + 2, 400, aiButtonRect.height);
         if (submitRect.Contains(Event.current.mousePosition)) tooltipRect = new Rect(submitRect.xMax, submitRect.yMin - submitRect.height + 2, 400, submitRect.height);
         if (vehicleLoadRect.Contains(Event.current.mousePosition)) tooltipRect = new Rect(vehicleLoadRect.xMax, vehicleLoadRect.yMin - vehicleLoadRect.height + 2, 400, vehicleLoadRect.height);
@@ -512,6 +581,9 @@ public class OpsPlanInterface : BaseDeliveryInterface
             // set the selected connector 
             selectedConnector = null;
 
+            if (tutorialStep == 6)
+                toggleTutorial();
+
         }
 
 
@@ -559,6 +631,9 @@ public class OpsPlanInterface : BaseDeliveryInterface
                     Capture.Log("ManualPathRemove;VehicleIndex=" + selectedPathIndex + ";RemovedIndex=" + customerID + ";RemovedPosition=" + position + ";VehicleName=" + plan.paths[selectedPathIndex].vehicle.tag + ";" + JsonConvert.SerializeObject(plan) + ";" + planCalculation.getLogString(), Capture.PLANNER);
 
                     playClick();
+
+                    if (tutorialStep == 9)
+                        toggleTutorial();
 
                 }
 
@@ -687,7 +762,7 @@ public class OpsPlanInterface : BaseDeliveryInterface
         bool alreadySelected = false;
         for (int j = 0; j < plan.paths.Count; j++)
             for (int i = 0; i < plan.paths[j].customers.Count; i++)
-                if (plan.paths[j].customers[i].id == customerId)
+                if (plan.paths[j].customers[i].id == customerId && plan.paths[j].customers[i].weight > 0)
                     alreadySelected = true;
 
         // if not selected
@@ -725,6 +800,16 @@ public class OpsPlanInterface : BaseDeliveryInterface
                 Capture.Log("ManualPathAdded;VehicleIndex=" + selectedPathIndex + ";AddedIndex=" + customerId + ";AddedPosition=" + addedposition + ";VehicleTag=" + plan.paths[selectedPathIndex].vehicle.tag + ";" + JsonConvert.SerializeObject(plan) + ";" + planCalculation.getLogString(), Capture.PLANNER);
                 playClick();
 
+                if (planPathCalculation.isRestrictedAirSpace()) // food not delivered in time
+                {
+                    debugStr = "Path : Restricted air space";
+                    ShowMsg("Restricted air space", true);
+                    Capture.Log("ManualPathAdded;RestrictedAirSpace", Capture.PLANNER);
+                }
+
+                if (tutorialStep == 5)
+                    toggleTutorial();
+
             }
             else if (planPathCalculation.getTotalRangeRemaining() < 0) // too long
             {
@@ -732,6 +817,10 @@ public class OpsPlanInterface : BaseDeliveryInterface
                 debugStr = "Path : range to long";
                 Capture.Log("ManualPathAdded;RangeTooLong", Capture.PLANNER);
                 ShowMsg("Path too long", true);
+
+                if (tutorialStep == 5)
+                    ShowMsg("Try a house closer to the warehouse", true);
+
             }
             else if (planPathCalculation.getTotalCapacityRemaining() < 0) // too high of capacity
             {
@@ -754,7 +843,6 @@ public class OpsPlanInterface : BaseDeliveryInterface
                 Capture.Log("ManualPathAdded;FoodTimeConstraint", Capture.PLANNER);
                 ShowMsg("Food is not in time", true);
             }
-
         }
         else
         {
@@ -763,34 +851,29 @@ public class OpsPlanInterface : BaseDeliveryInterface
         }
     }
 
-    /// <summary>
-    /// 
-    /// run the AI planning agent
-    /// 
-    /// </summary>
-    private void runAIAgent()
+    protected override void checkOpenCache()
     {
 
-        // remove memory references
-        string planStr = JsonConvert.SerializeObject(plan);
-        Plan planCopy = JsonConvert.DeserializeObject<Plan>(planStr);
-        // romove all customers
-        foreach (VehicleDelivery delivery in planCopy.paths)
-            delivery.customers.Clear();
-
-        bool includedVehicles = planCopy.paths.Count > 0;
-        if (!includedVehicles)
+        if (!plan.valid)
         {
-            ShowMsg("No vehicles selected", true);
-            return;
+            bool valid = true;
+            foreach (DataObjects.VehicleDelivery p in plan.paths)
+            {
+                PlanPathCalculation planPathCalculation = new PlanPathCalculation(p);
+                planPathCalculation.calculate();
+                if (planPathCalculation.isRestrictedAirSpace())
+                    valid = false;
+            }
+            if (valid)
+            {
+                GameObject.Find("restapi").GetComponent<RestWebService>().PutPlan(plan.id);
+                loadedPlans[plan.id].plan.valid = true;
+            }
+
         }
 
-        // remove selected path
-        selectedPathIndex = -1;
-
-        // send to server
-        GameObject.Find("restapi").GetComponent<RestWebService>().PostPlanToAI(planCopy);
-
+        if (tutorialStep == 10)
+            toggleTutorial();
     }
 
     /// <summary>
@@ -827,14 +910,25 @@ public class OpsPlanInterface : BaseDeliveryInterface
                 bool tooLong = false;
                 if (planTag.Length > 20)              
                     tooLong = true;
-                
 
                 // submit plan if the name is valid
                 if (!existingName && !tooLong)
                 {
-                    plan.tag = planTag;
-                    DataInterface.PostPlan(plan);
-                    Capture.Log("SubmitPlanToDB;" + planTag + ";" + JsonConvert.SerializeObject(plan) + ";" + planCalculation.getLogString(), Capture.PLANNER);
+ 
+                    if (tutorialStep == 8)
+                    {
+                        toggleTutorial();
+                        plan.tag = planTag;
+                        DataInterface.PostPlan(plan);
+                    } 
+                    else
+                    {
+                        plan.tag = planTag;
+                        DataInterface.PostPlan(plan);
+                        Capture.Log("SubmitPlanToDB;" + planTag + ";" + JsonConvert.SerializeObject(plan) + ";" + planCalculation.getLogString(), Capture.PLANNER);
+                    }
+
+
                 } else if (tooLong)
                 {
                     ShowMsg("Plan name is too long", true);
@@ -869,7 +963,105 @@ public class OpsPlanInterface : BaseDeliveryInterface
 
     }
 
+
+    /// <summary>
+    /// 
+    /// run the AI planning agent
+    /// 
+    /// </summary>
+    private void runAIAgent()
+    {
+
+        // remove memory references
+        string planStr = JsonConvert.SerializeObject(plan);
+        Plan planCopy = JsonConvert.DeserializeObject<Plan>(planStr);
+        // romove all customers
+        foreach (VehicleDelivery delivery in planCopy.paths)
+            delivery.customers.Clear();
+
+        bool includedVehicles = planCopy.paths.Count > 0;
+        if (!includedVehicles)
+        {
+            ShowMsg("No vehicles selected", true);
+            return;
+        }
+
+        // remove selected path
+        selectedPathIndex = -1;
+
+        // send to server
+        GameObject.Find("restapi").GetComponent<RestWebService>().PostPlanToAI(planCopy);
+
+    }
+
     protected override void setPlanFromPlan(Plan sentPlan){}
+
+    protected override void toggleTutorial()
+    {
+        tutorialStep += 1;
+        if (tutorialStep == 1)
+            GameObject.Find("planner_tutorialpage1").GetComponent<Canvas>().enabled = true;
+        if (tutorialStep == 2)
+        {
+            GameObject.Find("planner_tutorialpage1").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("planner_tutorialpage2").GetComponent<Canvas>().enabled = true;
+        }
+        if (tutorialStep == 3)
+        {
+            GameObject.Find("planner_tutorialpage2").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("planner_tutorialpage3").GetComponent<Canvas>().enabled = true;
+        }
+        if (tutorialStep == 4)
+        {
+            GameObject.Find("planner_tutorialpage3").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("planner_tutorialpage4").GetComponent<Canvas>().enabled = true;
+        }
+        if (tutorialStep == 5)
+        {
+            GameObject.Find("planner_tutorialpage4").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("planner_tutorialpage5").GetComponent<Canvas>().enabled = true;
+        }
+        if (tutorialStep == 6)
+        {
+            GameObject.Find("planner_tutorialpage5").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("planner_tutorialpage6").GetComponent<Canvas>().enabled = true;
+        }
+        if (tutorialStep == 7)
+        {
+            GameObject.Find("planner_tutorialpage6").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("planner_tutorialpage7").GetComponent<Canvas>().enabled = true;
+        }
+        if (tutorialStep == 8)
+        {
+            GameObject.Find("planner_tutorialpage7").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("planner_tutorialpage8").GetComponent<Canvas>().enabled = true;
+        }
+        if (tutorialStep == 9)
+        {
+            GameObject.Find("planner_tutorialpage8").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("planner_tutorialpage9").GetComponent<Canvas>().enabled = true;
+        }
+        if (tutorialStep == 10)
+        {
+            GameObject.Find("planner_tutorialpage9").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("planner_tutorialpage10").GetComponent<Canvas>().enabled = true;
+        }
+        if (tutorialStep == 11)
+        {
+            GameObject.Find("planner_tutorialpage10").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("planner_tutorialpage11").GetComponent<Canvas>().enabled = true;
+        }
+        if (tutorialStep == 12)
+        {
+            GameObject.Find("planner_tutorialpage11").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("planner_tutorialpage12").GetComponent<Canvas>().enabled = true;
+        }
+        if (tutorialStep == 13)
+        {
+            GameObject.Find("planner_tutorialpage12").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("planner_tutorialpagelast").GetComponent<Canvas>().enabled = true;
+        }
+    }
 
 }
 

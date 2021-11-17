@@ -1,4 +1,5 @@
-﻿using DataObjects;
+﻿using System.Collections.Generic;
+using DataObjects;
 using UnityEngine;
 
 namespace PlanToolHelpers
@@ -53,7 +54,7 @@ namespace PlanToolHelpers
         /// <summary>
         /// total vehicle travel time in hours
         /// </summary>
-        private float totalVehicleRange = 0;
+        private float totalVehicleTime = 0;
 
         /// <summary>
         /// total parcel delivered to all customers
@@ -74,6 +75,11 @@ namespace PlanToolHelpers
         /// log string displayed in the data logs
         /// </summary>
         private string logString = "";
+
+        private bool[] restrictedAirSpace;
+
+        private Dictionary<int, List<int>> restrictedAirSpaceSegmets = new Dictionary<int, List<int>>();
+
 
         /// <summary>
         /// main constructor
@@ -102,6 +108,9 @@ namespace PlanToolHelpers
             // set fixed cost
             startupCost = 0;
 
+            // restricted air space
+            restrictedAirSpace = new bool[plan.paths.Count];
+
             // for all paths
             for (int i = 0; i < plan.paths.Count; i++)
             {
@@ -109,22 +118,29 @@ namespace PlanToolHelpers
                 // get the path calculation
                 PlanPathCalculation pathCalculation = new PlanPathCalculation(plan.paths[i]);
                 pathCalculation.calculate();
-                totalVehicleRange += pathCalculation.getTotalRange();
 
-                // get the total food and parcel delivered
-                totalWeightDelivered += pathCalculation.getTotalCapacity();
-                totalFoodDelivered += pathCalculation.getTotalFoodDelivered();
-                totalParcelDelivered += pathCalculation.getTotalParcelDelivered();
+                restrictedAirSpace[i] = pathCalculation.isRestrictedAirSpace();
+                restrictedAirSpaceSegmets[i] = pathCalculation.getRestrictedSegments();
+                startupCost += (int)(plan.paths[i].vehicle.cost);
+                if (!restrictedAirSpace[i])
+                {
 
-                // update customer count and fixed cost 
-                customers += plan.paths[i].customers.Count;
-                startupCost += (int) (plan.paths[i].vehicle.cost);
+                    totalVehicleTime += pathCalculation.getTotalTime();
+
+                    // get the total food and parcel delivered
+                    totalWeightDelivered += pathCalculation.getTotalCapacity();
+                    totalFoodDelivered += pathCalculation.getTotalFoodDelivered();
+                    totalParcelDelivered += pathCalculation.getTotalParcelDelivered();
+
+                    // update customer count and fixed cost 
+                    customers += plan.paths[i].customers.Count;
+                }
 
             }
             
             // calculate operational cost, profit, and fixed cost
             // 100 is just a constant set to represent a cost per mile  
-            operatingCost = (float)(System.Math.Round((double)totalVehicleRange * 100));
+            operatingCost = (float)(System.Math.Round((double)totalVehicleTime * 100));
 
             // 200 and 100 are based on the problem statement
             profit = 200 * totalFoodDelivered + 100 * totalParcelDelivered;
@@ -235,6 +251,15 @@ namespace PlanToolHelpers
             return logString;
         }
 
+        public bool[] getRestrictedAirSpace()
+        {
+            return restrictedAirSpace;
+        }
+
+        public Dictionary<int, List<int>> getRestrictedAirSpaceSegments()
+        {
+            return restrictedAirSpaceSegmets;
+        }
 
     }
 }

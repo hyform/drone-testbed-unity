@@ -52,6 +52,15 @@ namespace DesignerAssets
         }
 
         /// <summary>
+        /// Updates vehicle to be valid
+        /// </summary>
+        /// <param name="vehicle"></param>
+        public static void PutVehicle(int vehicle_id)
+        {
+            GameObject.Find("restapi").GetComponent<RestWebService>().PutVehicle(vehicle_id);
+        }
+
+        /// <summary>
         /// 
         /// gets suggested AI designer vehicles
         /// 

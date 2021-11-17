@@ -209,6 +209,11 @@ namespace DesignerAssets
         /// </summary>
         private UAVPhysics physics = null;
 
+
+        private String validConfigCheck = "";
+        private int validConfigCheckId = -1;
+
+
         // string constants
         public static string VEHICLECOMPONENT = "rb";
         public static string PROTOTYPESTRUCTURE = "protostructure";
@@ -282,6 +287,16 @@ namespace DesignerAssets
         private Rect dbRect;
         private Rect loadBoxRect = new Rect(0, 0, 1, 1);
 
+        private bool setShock = true;
+        private bool shockConstraintHit = false;
+
+        /// <summary>
+        /// 
+        /// tutorial step
+        /// 
+        /// </summary>
+        protected int tutorialStep = 0;
+
         /// <summary>
         /// 
         /// Unity Start method
@@ -289,6 +304,10 @@ namespace DesignerAssets
         /// </summary>
         void Start()
         {
+
+
+            if (!Startup.tutorial)
+                tutorialStep = 100;
 
             Application.targetFrameRate = 30;
 
@@ -314,7 +333,9 @@ namespace DesignerAssets
             updateHistory(BASEVEHICLECONFIG);
 
             // load save vehicles and load bse gui vehicle
-            DataInterface.GetVehicles();  
+            DataInterface.GetVehicles();
+
+            toggleTutorial();
 
         }
 
@@ -510,10 +531,12 @@ namespace DesignerAssets
             GUI.color = Color.white;
             GUI.Label(new Rect(20, 60, 120, 25), "Capacity (lb)");
             capacityStr = GUI.TextField(new Rect(110, 62, 28, 25), capacityStr + "", 2);
+            bool text_change = false;
             if (!capacityStr.Equals(previousCapacityStr))
             {
                 Capture.Log("CapacityInput;" + capacityStr, Capture.DESIGNER);
                 previousCapacityStr = capacityStr;
+                text_change = true;
             }
 
             // bound the capacity
@@ -524,10 +547,15 @@ namespace DesignerAssets
                 int capacity = i;
 
                 // bound the payload
-                capacity = Math.Max(1, capacity);
+                capacity = Math.Max(0, capacity);
                 capacityStr = "" + capacity;
                 previousCapacityStr = capacityStr;
-            } 
+            }
+
+            if (validCapacity && text_change && tutorialStep == 7)
+            {
+                toggleTutorial();
+            }
 
             // create right side team designs list
             GUI.Box(loadBoxRect, new GUIContent("Team Designs", ""));
@@ -551,12 +579,19 @@ namespace DesignerAssets
             foreach (Vehicle s in teamDesigns)
             {
                 // add button to open a design
+                if (!s.valid)
+                {
+                    GUI.color = new Color(1.0f, 0.4f, 0.0f);
+                }
+
                 if (GUI.Button(new Rect(0, 0 + counter * 24, 164, 20), new GUIContent(s.tag, "Select to Open : " + s.tag + "\n" + s.range.ToString("0.0") + " mi\n" + s.payload.ToString("0") + " lb\n$" + UAVDesigner.getShockCost(s.cost).ToString("0") + "\n" + s.velocity.ToString("0.0") + " mph")))
                 {
                     GUIAssets.PopupButton.popupPanelID = OPENDESIGNPOPUPCONFIRM;
-                    GUIAssets.PopupButton.storedData = OPENDESIGN + ";" + s.tag + ";" + s.config + ";" + s.range.ToString("0.00") + ";" + s.payload.ToString("0") + ";" + UAVDesigner.getShockCost(s.cost).ToString("0") + ";" + s.velocity.ToString("0.00");
+                    GUIAssets.PopupButton.storedData = OPENDESIGN + ";" + s.tag + ";" + s.config + ";" + s.range.ToString("0.00") + ";" + s.payload.ToString("0") + ";" + UAVDesigner.getShockCost(s.cost).ToString("0") + ";" + s.velocity.ToString("0.00") + ";" + s.id + ";" + s.valid;
                     GameObject.Find(OPENDESIGNPOPUPCONFIRM).GetComponent<Canvas>().enabled = true;
                 }
+
+                GUI.color = Color.white;
                 counter += 1;
             }
             // End the scroll view that we began above
@@ -567,13 +602,25 @@ namespace DesignerAssets
             {
                 if (GUI.Button(evalRect, new GUIContent("Evaluate", "Evaluate the Design Performance in a Test Environment")))
                 {
+                    checkForConstraint();
+                    if (shockConstraintHit)
+                    {
+                        ShowMsg("Design Hits Size Constraints", true);
+                        Capture.Log("NoEvaluateBasedOnConstraint;" + generatestring(), Capture.DESIGNER);
+                        return;
+                    }
+
+                    if (tutorialStep == 9)
+                    {
+                        toggleTutorial();
+                    }
+
                     aiRun = false;
                     // runServerEvaluation();
                     runLocalEvaluation();
                     Capture.Log("Evaluate;" + generatestring(), Capture.DESIGNER);
                     ShowMsg("Evaluating ...", false);
                     playClick();
-
                 }
             }
 
@@ -699,6 +746,9 @@ namespace DesignerAssets
             if (!GameObject.Find(SUBMITDESIGNCANVAS).GetComponent<Canvas>().enabled)
             {
 
+                if (tutorialStep == 8)
+                    toggleTutorial();
+
                 // show return to design mode and submit buttons
 
                 // button to toggle back to design mode
@@ -707,6 +757,10 @@ namespace DesignerAssets
                     GameObject.Find(POPUPCONFIRMEVALUATION).GetComponent<Canvas>().enabled = false;
                     ResetDesignModeView();
                     Capture.Log("DesignMode", Capture.DESIGNER);
+
+                    if (tutorialStep == 10)
+                        toggleTutorial();
+
                 }
 
                 // if successful evaluation, show the Submit button
@@ -715,7 +769,9 @@ namespace DesignerAssets
                     {
                         // show the popup controls to submit a design with a tag
                         designtag = "";
-                        GameObject.Find(SUBMITINPUTTAG).GetComponent<TMP_InputField>().text = "";
+                        GameObject.Find(SUBMITINPUTTAG).GetComponent<TMP_InputField>().text = "r" + (int)lastOutput.range + "_c" + capacityStr + "_$" + (int)lastOutput.cost;
+
+
                         GUIAssets.PopupButton.popupPanelID = SUBMITDESIGNCANVAS;
                         GUIAssets.PopupButton.showing = true;
                         GameObject.Find(SUBMITDESIGNCANVAS).GetComponent<Canvas>().enabled = true;
@@ -881,6 +937,13 @@ namespace DesignerAssets
                         updateHistory(s);
                         playClick();
                         Capture.Log("MouseClick;" + result[0] + ";" + s + ";" + result[1], Capture.DESIGNER);
+
+                        Debug.Log(result[0]);
+                        if (tutorialStep == 1 && result[0].Contains("Toggle"))
+                            toggleTutorial();
+                        if (tutorialStep == 2 && result[0].Contains("AssemblyChange"))
+                            toggleTutorial();
+
                     }
 
                 }
@@ -909,6 +972,10 @@ namespace DesignerAssets
                     updateHistory(s);
                     playClick();
                     Capture.Log((Input.GetMouseButtonDown(1) ? "ScaleUp;" : "HotKeyScaleUp;") + s + ";" + getJointPositionStr(selected), Capture.DESIGNER);
+
+                    if (tutorialStep == 5)
+                        toggleTutorial();
+
                 }
             }
 
@@ -926,7 +993,10 @@ namespace DesignerAssets
                     updateHistory(s);
                     playClick();
                     Capture.Log((Input.GetKeyDown(KeyCode.DownArrow) ? "HotKeyScaleDown;" : "ScaleDown;") + s + ";" + getJointPositionStr(selected), Capture.DESIGNER);
-                    
+
+                    if (tutorialStep == 6)
+                        toggleTutorial();
+
                 }
             }
 
@@ -1009,6 +1079,9 @@ namespace DesignerAssets
                             playClick();
                             Capture.Log("RemovedComponent;" + generatestring() + ";" + getJointPositionStr(selected), Capture.DESIGNER);
 
+                            if (tutorialStep == 4)
+                                toggleTutorial();
+
                         }
 
                         // delete connector 
@@ -1090,6 +1163,9 @@ namespace DesignerAssets
                                 updateHistory(s);
 
                                 playClick();
+
+                                if (tutorialStep == 3)
+                                    toggleTutorial();
 
                             }
                             else
@@ -1717,6 +1793,12 @@ namespace DesignerAssets
                 Capture.Log("ServerMessage;" + serverResultsStr, Capture.DESIGNER);
             }
 
+            if (setShock && RestWebService.market != 0)
+            {
+                toggleShock();
+                setShock = false;
+            }
+
             // still some issues we need to resolve before switching to a server base evaluation
             //// return evaluation result from the server
             //if(RestWebService.uavEvaluation != null)
@@ -1860,6 +1942,7 @@ namespace DesignerAssets
                             vehicle.velocity = lastOutput.velocity;
                             vehicle.cost = lastOutput.cost;
                             vehicle.result = lastOutput.result;
+                            vehicle.valid = true;
 
                             int capacity = (int) double.Parse(vehicle.config.Split(',')[1]);
                             vehicle.payload = capacity;
@@ -1899,6 +1982,10 @@ namespace DesignerAssets
                         ResetDesignModeView();
                     } 
                 }
+
+                if (tutorialStep == 10)
+                    toggleTutorial();
+
             }
 
             // ok selected to reset to base design
@@ -1916,6 +2003,11 @@ namespace DesignerAssets
 
                 playClick();
 
+                if (tutorialStep == 8)
+                {
+                    toggleTutorial();
+                }
+
             }
 
             // ok selected to open a new design
@@ -1930,6 +2022,8 @@ namespace DesignerAssets
                 string capacity = GUIAssets.PopupButton.storedData.Split(';')[4];
                 string cost = GUIAssets.PopupButton.storedData.Split(';')[5];
                 string velocity = GUIAssets.PopupButton.storedData.Split(';')[6];
+                string id = GUIAssets.PopupButton.storedData.Split(';')[7];
+                string valid = GUIAssets.PopupButton.storedData.Split(';')[8];
 
                 // deselect the ok button
                 GUIAssets.PopupButton.ok = false;
@@ -1943,6 +2037,17 @@ namespace DesignerAssets
 
                 updateHistory(config);
                 playClick();
+
+                if (tutorialStep == 11)
+                {
+                    toggleTutorial();
+                }
+
+                if (valid.Equals("False"))
+                {
+                    validConfigCheck = generatestring();
+                    validConfigCheckId = int.Parse(id);
+                }
 
             }
 
@@ -1989,6 +2094,70 @@ namespace DesignerAssets
             historyIndex = history.Count - 1;
         }
 
+        private void checkForConstraint()
+        {
+
+            if (!GameObject.Find("sizeconstraintleft").gameObject.GetComponent<MeshRenderer>().enabled)
+            {
+                shockConstraintHit = false;
+                return;
+            }
+
+            shockConstraintHit = false;
+            foreach (GameObject joint in jointGraph.Keys)
+            {
+                if (jointGraph[joint].gameObj != null)
+                {
+                    MeshFilter render = jointGraph[joint].gameObj.GetComponent<MeshFilter>();
+                    if (render != null)
+                    {
+                        Matrix4x4 localToWorld = jointGraph[joint].gameObj.transform.localToWorldMatrix;
+                        //if (jointGraph[joint].gameObj.name.StartsWith("motor"))
+                        //{
+                        //    Matrix4x4 childlocalmatrix = jointGraph[joint].gameObj.transform.Find("blades").transform.localToWorldMatrix;
+                        //    localToWorld = localToWorld * 3;
+                        //}
+                        for (int i = 0; i < render.mesh.vertices.Length; ++i)
+                        {
+
+                            Vector3 locationVert = render.mesh.vertices[i];
+                            if (jointGraph[joint].gameObj.name.StartsWith("motor")) // for motors one has to scale by the child blades
+                            {
+                                locationVert.x = locationVert.x * 6;
+                                locationVert.z = locationVert.z * 6;
+                            }
+                            Vector3 world_v = localToWorld.MultiplyPoint3x4(locationVert);
+                            float d = Math.Abs(Vector2.Dot(new Vector2(world_v.z, world_v.x), new Vector2(0.707f, -0.707f)));
+                            //if (jointGraph[joint].gameObj.name.StartsWith("motor"))
+                            //    Debug.Log("test " + world_v.z + " " + world_v.x + " " + locationVert + " " + localToWorld + " " + jointGraph[joint].gameObj.name);
+                            if (d > 17.26) // 0.707 * 12 + 0.707 * 12 for constraint
+                            {
+                                shockConstraintHit = true;
+                            }
+                        }
+                    }
+                }
+            }
+            foreach (GameObject connection in connectionGraph.Keys)
+            {
+                MeshFilter render = connection.GetComponent<MeshFilter>();
+                if (render != null)
+                {
+                    Matrix4x4 localToWorld = connection.transform.localToWorldMatrix;
+                    for (int i = 0; i < render.mesh.vertices.Length; ++i)
+                    {
+                        Vector3 world_v = localToWorld.MultiplyPoint3x4(render.mesh.vertices[i]);
+                        float d = Math.Abs(Vector2.Dot(new Vector2(world_v.z, world_v.x), new Vector2(0.707f, -0.707f)));
+                        if (d > 17) // 0.707 * 12 + 0.707 * 12 for constraint
+                        {
+                            shockConstraintHit = true;
+                        }
+                    }
+                }
+            }
+
+        }
+
 
         /// <summary>
         /// 
@@ -1998,6 +2167,8 @@ namespace DesignerAssets
         /// <returns></returns>
         private string generatestring()
         {
+
+            checkForConstraint();
 
             try
             {
@@ -2536,6 +2707,12 @@ namespace DesignerAssets
                                 UAVDesigner.getShockCost(lastOutput.cost), lastOutput.velocity, null);
                             bottomLogString = GetResults("Last Run", " : ", lastOutput.range, capacity, UAVDesigner.getShockCost(lastOutput.cost), lastOutput.velocity, null); ;
                             ShowMsg("Showing Trajectory : " + resultMessage, false);
+
+                            if (validConfigCheck.Equals(config))
+                            {
+                                DataInterface.PutVehicle(validConfigCheckId);
+                            }
+
                         }
                         else
                         {
@@ -2681,6 +2858,15 @@ namespace DesignerAssets
 
         }
 
+        /// <summary>
+        /// Toggles the display of the restriced air space
+        /// </summary>
+        protected void toggleShock()
+        {
+            GameObject.Find("sizeconstraintleft").gameObject.GetComponent<MeshRenderer>().enabled = (RestWebService.market == 3);
+            GameObject.Find("sizeconstraintright").gameObject.GetComponent<MeshRenderer>().enabled = (RestWebService.market == 3);
+        }
+
         private string getMetaComponentData(GameObject obj)
         {
             string metaData = "";
@@ -2695,6 +2881,76 @@ namespace DesignerAssets
                 Debug.Log(e);
             }
             return metaData;
+        }
+
+
+        protected void toggleTutorial()
+        {
+            Debug.Log("tutorial step " + tutorialStep);
+            tutorialStep += 1;
+            Debug.Log("tutorial step  +++ " + tutorialStep);
+            if (tutorialStep == 1)
+                GameObject.Find("tutorialpage1").GetComponent<Canvas>().enabled = true;
+            if (tutorialStep == 2)
+            {
+                GameObject.Find("tutorialpage1").GetComponent<Canvas>().enabled = false;
+                GameObject.Find("tutorialpage2").GetComponent<Canvas>().enabled = true;
+            }
+            if (tutorialStep == 3)
+            {
+                GameObject.Find("tutorialpage2").GetComponent<Canvas>().enabled = false;
+                GameObject.Find("tutorialpage3").GetComponent<Canvas>().enabled = true;
+            }
+            if (tutorialStep == 4)
+            {
+                GameObject.Find("tutorialpage3").GetComponent<Canvas>().enabled = false;
+                GameObject.Find("tutorialpage4").GetComponent<Canvas>().enabled = true;
+            }
+            if (tutorialStep == 5)
+            {
+                GameObject.Find("tutorialpage4").GetComponent<Canvas>().enabled = false;
+                GameObject.Find("tutorialpage5").GetComponent<Canvas>().enabled = true;
+            }
+            if (tutorialStep == 6)
+            {
+                GameObject.Find("tutorialpage5").GetComponent<Canvas>().enabled = false;
+                GameObject.Find("tutorialpage6").GetComponent<Canvas>().enabled = true;
+            }
+            if (tutorialStep == 7)
+            {
+                GameObject.Find("tutorialpage6").GetComponent<Canvas>().enabled = false;
+                GameObject.Find("tutorialpage7").GetComponent<Canvas>().enabled = true;
+            }
+            if (tutorialStep == 8)
+            {
+                GameObject.Find("tutorialpage7").GetComponent<Canvas>().enabled = false;
+                GameObject.Find("tutorialpage8").GetComponent<Canvas>().enabled = true;
+            }
+            if (tutorialStep == 9)
+            {
+                GameObject.Find("tutorialpage8").GetComponent<Canvas>().enabled = false;
+                GameObject.Find("tutorialpage9").GetComponent<Canvas>().enabled = true;
+            }
+            if (tutorialStep == 10)
+            {
+                GameObject.Find("tutorialpage9").GetComponent<Canvas>().enabled = false;
+                GameObject.Find("tutorialpage10").GetComponent<Canvas>().enabled = true;
+            }
+            if (tutorialStep == 11)
+            {
+                GameObject.Find("tutorialpage10").GetComponent<Canvas>().enabled = false;
+                GameObject.Find("tutorialpage11").GetComponent<Canvas>().enabled = true;
+            }
+            if (tutorialStep == 12)
+            {
+                GameObject.Find("tutorialpage11").GetComponent<Canvas>().enabled = false;
+                GameObject.Find("tutorialpage12").GetComponent<Canvas>().enabled = true;
+            }
+            if (tutorialStep == 13)
+            {
+                GameObject.Find("planner_tutorialpage12").GetComponent<Canvas>().enabled = false;
+                GameObject.Find("planner_tutorialpagelast").GetComponent<Canvas>().enabled = true;
+            }
         }
 
 

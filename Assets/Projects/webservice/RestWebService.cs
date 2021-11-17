@@ -2,6 +2,7 @@
 using UnityEngine;
 using UnityEngine.Networking;
 using Newtonsoft.Json;
+using System;
 
 namespace DataObjects
 {
@@ -380,6 +381,75 @@ namespace DataObjects
                }));
         }
 
+
+        /// <summary>
+        /// post scenario to the central server
+        /// </summary>
+        /// <param name="scenario">Scenario object</param>
+        public void PutVehicle(int vehicle_id)
+        {
+            StartCoroutine(SessionLib.FullWebRequest(GetCentralDatastoreEndpoint() + "vehicle/" + vehicle_id + "/", "PUT",
+               request =>
+               {
+
+                   Vehicle v = new Vehicle();
+                   v.id = vehicle_id;
+
+
+                   // post a scenario object
+                   string vehiclePutData = JsonConvert.SerializeObject(v);
+                   Debug.Log("put data " + vehiclePutData);
+                   request.redirectLimit = 0;
+                   byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(vehiclePutData);
+                   request.uploadHandler = (UploadHandler)new UploadHandlerRaw(bodyRaw);
+                   request.SetRequestHeader("Content-Type", "application/json");
+
+               },
+               request =>
+               {
+                   resultstr = " Put Vehicle : " + getServerResponse(request.responseCode);
+                   Debug.Log("Status Code: " + request.responseCode + " " + " " + request.downloadHandler.text);
+               }));
+        }
+
+
+        /// <summary>
+        /// post scenario to the central server
+        /// </summary>
+        /// <param name="scenario">Scenario object</param>
+        public void PutPlan(int plan_id)
+        {
+            StartCoroutine(SessionLib.FullWebRequest(GetCentralDatastoreEndpoint() + "plan/" + plan_id + "/", "PUT",
+               request =>
+               {
+
+                   Debug.Log("put");
+                   Plan p = new Plan();
+                   p.id = plan_id;
+
+
+                   // post a scenario object
+                   string planPutData = JsonConvert.SerializeObject(p);
+                   Debug.Log("planPutData " + planPutData);
+                   request.redirectLimit = 0;
+                   byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(planPutData);
+                   request.uploadHandler = (UploadHandler)new UploadHandlerRaw(bodyRaw);
+                   request.SetRequestHeader("Content-Type", "application/json");
+
+               },
+               request =>
+               {
+                   try
+                   {
+                       Debug.Log(request.downloadHandler.text);
+                       Debug.Log("Status Code: " + request.responseCode + " " + " " + request.downloadHandler.text);
+                   } catch (Exception e)
+                   {
+                       Debug.Log(e);
+                   }
+               }));
+        }
+
         /// <summary>
         /// posts a set of vehicles and customers the central service and it returns 
         /// an AI plan result
@@ -738,6 +808,18 @@ namespace DataObjects
         /// plan tag 
         /// </summary>
         public string tag;
+
+
+    }
+
+
+    public class VehiclePut
+    {
+
+        /// <summary>
+        /// plan integer id
+        /// </summary>
+        public int id;
 
     }
 

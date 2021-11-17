@@ -14,13 +14,22 @@ public class StartupMono : MonoBehaviour
         Startup.csrfToken = SessionLib.GetCSRFToken();
         Startup.userid = SessionLib.GetUserName();
         String isAiStr = SessionLib.GetIsAI();
+        String isTutorialStr = SessionLib.GetIsTutorial();
         if(isAiStr.Equals("True"))
         {
             Startup.isAI = true;
         } else
         {
             Startup.isAI = false;
-        }        
+        }   
+        
+        if(isTutorialStr.Equals("True"))
+        {
+            Startup.tutorial = true;
+        } else
+        {
+            Startup.tutorial = false;
+        }
 
         string[] useridParts = Startup.userid.Split('_');
         if (useridParts.Length > 0)

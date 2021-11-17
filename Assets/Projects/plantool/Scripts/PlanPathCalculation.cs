@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using DataObjects;
+using UnityEngine;
 
 namespace PlanToolHelpers
 {
@@ -47,6 +48,13 @@ namespace PlanToolHelpers
         private int totalFoodDelivered = 0;
 
         /// <summary>
+        /// variable to make sure food gets delivered in the food time windows
+        /// </summary>
+        private bool restrictedAir = false;
+
+        private List<int> restrictedSegments = new List<int>();
+
+        /// <summary>
         /// main constructor
         /// </summary>
         /// <param name="path">VehicleDelivery object</param>
@@ -67,7 +75,7 @@ namespace PlanToolHelpers
         /// <returns></returns>
         private float distance(float x1, float x2, float z1, float z2)
         {
-            return (float) Math.Sqrt(System.Math.Pow(x1 - x2, 2) + Math.Pow(z1 - z2, 2));
+            return (float)Math.Sqrt(System.Math.Pow(x1 - x2, 2) + Math.Pow(z1 - z2, 2));
         }
 
         /// <summary>
@@ -88,10 +96,15 @@ namespace PlanToolHelpers
                     path.warehouse.address.x,
                     pathPoints[0].address.z,
                     path.warehouse.address.z);
-                endTime = (float) (totalRange / path.vehicle.velocity);
-                totalCapacity = (int) pathPoints[0].weight;
+                endTime = (float)(totalRange / path.vehicle.velocity);
+                totalCapacity = (int)pathPoints[0].weight;
                 foodDeliveryCheck(pathPoints[0]);
-                pathPoints[0].deliverytime = (float) endTime;
+                checkCollision(pathPoints[0].address.x,
+                    path.warehouse.address.x,
+                    pathPoints[0].address.z,
+                    path.warehouse.address.z,
+                    -3, 3, 1, 0);
+                pathPoints[0].deliverytime = (float)endTime;
 
 
                 // go through all middle segments of the path
@@ -102,9 +115,14 @@ namespace PlanToolHelpers
                         pathPoints[i].address.z,
                         pathPoints[i - 1].address.z);
                     totalRange += dist;
-                    totalCapacity += (int) pathPoints[i].weight;
-                    endTime += (float) (dist / path.vehicle.velocity);
+                    totalCapacity += (int)pathPoints[i].weight;
+                    endTime += (float)(dist / path.vehicle.velocity);
                     foodDeliveryCheck(pathPoints[i]);
+                    checkCollision(pathPoints[i].address.x,
+                        pathPoints[i - 1].address.x,
+                        pathPoints[i].address.z,
+                        pathPoints[i - 1].address.z,
+                        -3, 3, 1, i);
                     pathPoints[i].deliverytime = (float)endTime;
                 }
 
@@ -114,8 +132,13 @@ namespace PlanToolHelpers
                     pathPoints[pathPoints.Count - 1].address.z,
                     path.warehouse.address.z);
                 totalRange += returndist;
-                endTime += (float) (returndist / path.vehicle.velocity);
+                endTime += (float)(returndist / path.vehicle.velocity);
                 pathPoints[pathPoints.Count - 1].deliverytime = (float)endTime;
+                checkCollision(pathPoints[pathPoints.Count - 1].address.x,
+                    path.warehouse.address.x,
+                    pathPoints[pathPoints.Count - 1].address.z,
+                    path.warehouse.address.z,
+                    -3, 3, 1, pathPoints.Count);
 
             }
 
@@ -125,16 +148,18 @@ namespace PlanToolHelpers
         /// adjusts delivery time and food window check
         /// </summary>
         /// <param name="customer"></param>
-        public void foodDeliveryCheck(Customer customer) {
+        public void foodDeliveryCheck(Customer customer)
+        {
             if (customer.payload.Equals("food2"))
             {
                 endTime = Math.Max(endTime, 4);
                 if (endTime > 6)
                     foodCheck = false;
-                totalFoodDelivered += (int) customer.weight;
-            } else
+                totalFoodDelivered += (int)customer.weight;
+            }
+            else
             {
-                totalParcelDelivered += (int) customer.weight;
+                totalParcelDelivered += (int)customer.weight;
             }
         }
 
@@ -162,7 +187,7 @@ namespace PlanToolHelpers
         /// <returns></returns>
         public float getTotalRangeRemaining()
         {
-            return (float) (path.vehicle.range - totalRange);
+            return (float)(path.vehicle.range - totalRange);
         }
 
         /// <summary>
@@ -180,7 +205,7 @@ namespace PlanToolHelpers
         /// <returns></returns>
         public int getTotalCapacityRemaining()
         {
-            return (int) (path.vehicle.payload - totalCapacity);
+            return (int)(path.vehicle.payload - totalCapacity);
         }
 
         /// <summary>
@@ -233,6 +258,60 @@ namespace PlanToolHelpers
                 (getRemainingTime() >= 0);
         }
 
+        public bool isRestrictedAirSpace()
+        {
+            return restrictedAir;
+        }
+
+        public List<int> getRestrictedSegments()
+        {
+            return restrictedSegments;
+        }
+
+        private void checkCollision(float x1, float x2, float z1, float z2, float x, float z, float radius, int segmentIndex)
+        {
+
+            // check if restricted airspace shock is enabled
+            if (UnityEngine.GameObject.Find("restrictedairspace").gameObject.GetComponent<UnityEngine.MeshRenderer>().enabled)
+            {
+
+                UnityEngine.Debug.Log("entered shock code");
+
+                // Finding the distance of line from center.
+                double dist = Math.Abs((x2 - x1) * (z1 - z) - (x1 - x) * (z2 - z1)) /
+                                Math.Sqrt((x2 - x1) * (x2 - x1) + (z2 - z1) * (z2 - z1));
+
+     
+                double x1_vect = x1 - x;
+                double x2_vect = x2 - x;
+
+                double z1_vect = z1 - z;
+                double z2_vect = z2 - z;
+
+                double sin = x1_vect * z2_vect - x2_vect * z1_vect;
+                double cos = x1_vect * x2_vect + z1_vect * z2_vect;
+
+                double angle_diff = Math.Abs(Math.Atan2(sin, cos) * (180 / Math.PI));
+
+                // Checking if the distance is less than,
+                // greater than or equal to radius and the emdpoint lie in different quadrants
+
+                if (radius >= dist)
+                {
+                    //if (!(x1dir == x2dir && z1dir == z2dir))
+                    if (angle_diff > 45)
+                    {
+                        UnityEngine.Debug.Log(radius + " a " + dist);
+                        restrictedAir = true;
+                        restrictedSegments.Add(segmentIndex);
+                        UnityEngine.Debug.Log("restricted " + radius + " " + dist + " " + x1 + " " + z1 + " " + x2 + " " + z2 + " " + x + " " + z);
+
+                    }  
+                }
+
+            }
+
+        }
 
     }
 }

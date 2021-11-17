@@ -36,6 +36,7 @@ namespace Assets
         public static Texture2D selectedplan;
         public static Texture2D losingplan;
         public static Texture2D dashboardimage;
+        //public static Texture2D dashboardimagehighlight;
         public static Texture2D infoimage;
         public static Texture2D tagimage;
 
@@ -62,6 +63,7 @@ namespace Assets
             selectedplan = Resources.Load("selected") as Texture2D;
             losingplan = Resources.Load("losing") as Texture2D;
             dashboardimage = Resources.Load("bill") as Texture2D;
+            //dashboardimagehighlight = Resources.Load("billhighlight") as Texture2D;
             infoimage = Resources.Load("info") as Texture2D;
             tagimage = Resources.Load("tag") as Texture2D;
         }

@@ -69,6 +69,11 @@ namespace DataObjects
         public double payload { get; set; }
 
         /// <summary>
+        /// capacity in lb
+        /// </summary>
+        public bool valid { get; set; }
+
+        /// <summary>
         /// unique hash code
         /// </summary>
         /// <returns></returns>
@@ -435,6 +440,12 @@ namespace DataObjects
         /// name or tag of the plan
         /// </summary>
         public string tag { set; get; }
+
+
+        /// <summary>
+        /// name or tag of the plan
+        /// </summary>
+        public bool valid { set; get; }
 
         /// <summary>
         /// scenario associated with the plan

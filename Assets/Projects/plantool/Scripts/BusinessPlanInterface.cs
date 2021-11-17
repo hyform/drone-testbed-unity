@@ -124,82 +124,93 @@ public class BusinessPlanInterface : BaseDeliveryInterface
             // adds a toggle button if the plan is fully loaded
             bool loaded = loadedPlans[id].plan != null;
             string tag = (!loaded ? "* " : "") + loadedPlans[id].tag;
-            bool val = false;
+
+            bool show = true;
             if (loaded)
-                val = GUI.Toggle(new Rect(0, 20 + 20 * counter, 24, 20), loadedPlans[id].selected, new GUIContent("", "Toggle in Dashboard"));
+                if (!loadedPlans[id].plan.valid)
+                    show = false;
 
-            // if there is a change in plan selection
-            if ((val && !loadedPlans[id].selected) || (!val && loadedPlans[id].selected)) {
+            if (show)
+            {
+                bool val = false;
+                if (loaded)
+                    val = GUI.Toggle(new Rect(0, 20 + 20 * counter, 24, 20), loadedPlans[id].selected, new GUIContent("", "Toggle in Dashboard"));
 
-                RemovePlayIcons();
-
-                loadedPlans[id].selected = val;
-                if (!loadedPlans[id].selected)
-                    ShowMsg("Plan unselected : " + tag, false);
-
-                // code for a selected plan, probably do not need the loaded check, but kept it in
-                if (loadedPlans[id].selected && loaded)
+                // if there is a change in plan selection
+                if ((val && !loadedPlans[id].selected) || (!val && loadedPlans[id].selected))
                 {
 
-                    // calculate the plan metrics
-                    PlanCalculation calculation = new PlanCalculation(loadedPlans[id].plan, scaleSceneFactor, business);
-                    calculation.calculate();
+                    RemovePlayIcons();
 
-                    // add plan data to dashboard
-                    DashboardData.PlanData planData = new DashboardData.PlanData();
-                    planData.tag = tag;
-                    planData.profit = calculation.getProfit();
-                    planData.operatingCost = calculation.getOperatingCost();
-                    planData.startupCost = calculation.getStartupCost();
-                    planData.deliveries = calculation.getCustomers(); ;
-                    planData.massDelivered = calculation.GetTotalWeightDelivered();
-                    planData.parcelMass = calculation.getTotalParcelDelivered();
-                    planData.foodMass = calculation.getTotalFoodDelivered();
-                    DashboardData.addPlanData(loadedPlans[id].plan, planData);
+                    loadedPlans[id].selected = val;
+                    if (!loadedPlans[id].selected)
+                        ShowMsg("Plan unselected : " + tag, false);
 
-                    ShowMsg("Plan selected : " + tag, false);
+                    // code for a selected plan, probably do not need the loaded check, but kept it in
+                    if (loadedPlans[id].selected && loaded)
+                    {
+
+                        // calculate the plan metrics
+                        PlanCalculation calculation = new PlanCalculation(loadedPlans[id].plan, scaleSceneFactor, business);
+                        calculation.calculate();
+
+                        // add plan data to dashboard
+                        DashboardData.PlanData planData = new DashboardData.PlanData();
+                        planData.tag = tag;
+                        planData.profit = calculation.getProfit();
+                        planData.operatingCost = calculation.getOperatingCost();
+                        planData.startupCost = calculation.getStartupCost();
+                        planData.deliveries = calculation.getCustomers(); ;
+                        planData.massDelivered = calculation.GetTotalWeightDelivered();
+                        planData.parcelMass = calculation.getTotalParcelDelivered();
+                        planData.foodMass = calculation.getTotalFoodDelivered();
+                        DashboardData.addPlanData(loadedPlans[id].plan, planData);
+
+                        ShowMsg("Plan selected : " + tag, false);
+
+                    }
+
+                    // hide or show the Play button if two plans are selected
+                    int selectedPlans = 0;
+                    foreach (int idkey in loadedPlans.Keys)
+                        if (loadedPlans[idkey].selected)
+                            selectedPlans += 1;
+                    playEnabled = (selectedPlans == 2);
+
+                    Capture.Log("SelectedPlan;" + tag + ";" + loadedPlans[id].selected, Capture.BUSINESS);
+                    playClick();
 
                 }
-
-                // hide or show the Play button if two plans are selected
-                int selectedPlans = 0;
-                foreach (int idkey in loadedPlans.Keys)
-                    if (loadedPlans[idkey].selected)
-                        selectedPlans += 1;
-                playEnabled = (selectedPlans == 2);
-
-                Capture.Log("SelectedPlan;" + tag + ";" + loadedPlans[id].selected, Capture.BUSINESS);
-                playClick();
-
-            }
-            GUI.color = Color.white;
+                GUI.color = Color.white;
 
 
-            // add GUI button to open a plan
-            GUI.color = loaded ? Color.white : Color.gray;
-            if (loaded)
-            {
-                // check for play color results
-                if (loadedPlans[id].plan != null)
-                {
-                    if (loadedPlans[id].plan.Equals(winningPlayPlan))
-                        GUI.color = Color.green;
-                    else if (loadedPlans[id].plan.Equals(losingPlayPlan))
-                        GUI.color = Color.red;
-                }
-            }
-
-            // button to open the plan
-            if (GUI.Button(new Rect(20, 20 + 20 * counter, 120, 20), tag))
-            {
+                // add GUI button to open a plan
+                GUI.color = loaded ? Color.white : Color.gray;
                 if (loaded)
                 {
-                    userSelectedPlan = loadedPlans[id].plan;
-                    OpenPlan(loadedPlans[id].plan);
+                    // check for play color results
+                    if (loadedPlans[id].plan != null)
+                    {
+                        if (loadedPlans[id].plan.Equals(winningPlayPlan))
+                            GUI.color = Color.green;
+                        else if (loadedPlans[id].plan.Equals(losingPlayPlan))
+                            GUI.color = Color.red;
+                    }
                 }
+
+                // button to open the plan
+                if (GUI.Button(new Rect(20, 20 + 20 * counter, 120, 20), tag))
+                {
+                    if (loaded)
+                    {
+                        userSelectedPlan = loadedPlans[id].plan;
+                        OpenPlan(loadedPlans[id].plan);
+                    }
+                }
+                GUI.color = Color.white;
+                counter += 1;
+
             }
-            GUI.color = Color.white;
-            counter += 1;
         }
         GUI.EndScrollView();
 
@@ -367,6 +378,12 @@ public class BusinessPlanInterface : BaseDeliveryInterface
         ShowMsg("Plan opened: " + plan.tag, false);
         playClick();
         Capture.Log("Opened;" + planopen.tag + ";" + JsonConvert.SerializeObject(plan) + ";" + planCalculation.getLogString(), business ? Capture.BUSINESS : Capture.PLANNER);
+
+        if (tutorialStep == 4)
+        {
+            dashboardView = false;
+            toggleTutorial();
+        }
     }
 
     /// <summary>
@@ -403,14 +420,22 @@ public class BusinessPlanInterface : BaseDeliveryInterface
                 GameObject selectedObj = (GameObject)selectedCustomer[0];
                 Customer customer = (Customer)selectedCustomer[1];
 
-                customer.selected = !customer.selected;
-                if (selectedObj.transform.parent != null)
-                    selectedObj = selectedObj.transform.parent.gameObject;
+                if (customer.weight != 0)
+                {
+                    customer.selected = !customer.selected;
+                    if (selectedObj.transform.parent != null)
+                        selectedObj = selectedObj.transform.parent.gameObject;
 
-                ToggleHouseSelection(selectedObj, customer);
+                    ToggleHouseSelection(selectedObj, customer);
 
-                playClick();
-                Capture.Log("SelectNode;Index=" + customer.id + ";Selected=" + customer.selected + ";Position=" + customer.address.x + "," + customer.address.z + ";" + JsonConvert.SerializeObject(plan), business ? Capture.BUSINESS : Capture.PLANNER);
+                    playClick();
+                    Capture.Log("SelectNode;Index=" + customer.id + ";Selected=" + customer.selected + ";Position=" + customer.address.x + "," + customer.address.z + ";" + JsonConvert.SerializeObject(plan), business ? Capture.BUSINESS : Capture.PLANNER);
+
+                    if (tutorialStep == 1 && !customer.selected)
+                        toggleTutorial();
+                    if (tutorialStep == 2 && customer.selected)
+                        toggleTutorial();
+                }
 
             }
 
@@ -689,6 +714,40 @@ public class BusinessPlanInterface : BaseDeliveryInterface
             scenario.tag = scenarioLevel + "";
             DataInterface.PostScenario(scenario);
             Capture.Log("SubmitScenario;" + JsonConvert.SerializeObject(scenario), business ? Capture.BUSINESS : Capture.PLANNER);
+
+            if (tutorialStep == 3)
+            {
+                toggleTutorial();
+
+                DataObjects.VehicleDelivery p = simplePath();
+                p.vehicle = teamVehicles[0];
+                try
+                {
+                    p.warehouse = scenario.warehouse;
+                    foreach(Customer customer in scenario.customers)
+                    {
+                        if(Math.Sqrt(Math.Pow(p.warehouse.address.x - customer.address.x, 2) + Math.Pow(p.warehouse.address.z - customer.address.z, 2)) <= 5)
+                        {
+                            CustomerDelivery delivery = customer.clone();
+                            delivery.selected = true;
+                            p.customers.Add(delivery);
+                            break;
+                        }
+                    }
+
+                    
+                }
+                catch (Exception e)
+                {
+                    Debug.Log(e);
+                }
+
+                plan.paths.Add(p);
+                plan.tag = "tutorial";
+                DataInterface.PostPlan(plan);
+
+            }
+
         }
 
         // Business : submit a final plan
@@ -702,12 +761,86 @@ public class BusinessPlanInterface : BaseDeliveryInterface
             ShowMsg("Selected Final Plan for Your Team", false);
             Capture.Log("BusinessPlanSelected:" + plan.tag + ";" + plan.id + ";" + JsonConvert.SerializeObject(plan), business ? Capture.BUSINESS : Capture.PLANNER);
 
+            if (tutorialStep == 5)
+            {
+                toggleTutorial();
+            }
+
         }
 
     }
 
     protected override void setPlanFromPlan(Plan sentPlan){
         scenario = sentPlan.scenario; 
+    }
+
+    protected override void checkOpenCache(){}
+
+    protected override void toggleTutorial()
+    {
+        tutorialStep += 1;
+        if (tutorialStep == 1)
+            GameObject.Find("business_tutorialpage1").GetComponent<Canvas>().enabled = true;
+        if (tutorialStep == 2)
+        {
+            GameObject.Find("business_tutorialpage1").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("business_tutorialpage2").GetComponent<Canvas>().enabled = true;
+        }
+        if (tutorialStep == 3)
+        {
+            GameObject.Find("business_tutorialpage2").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("business_tutorialpage3").GetComponent<Canvas>().enabled = true;
+        }
+        if (tutorialStep == 4)
+        {
+            GameObject.Find("business_tutorialpage3").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("business_tutorialpage4").GetComponent<Canvas>().enabled = true;
+        }
+        if (tutorialStep == 5)
+        {
+            GameObject.Find("business_tutorialpage4").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("business_tutorialpage5").GetComponent<Canvas>().enabled = true;
+        }
+        if (tutorialStep == 6)
+        {
+            GameObject.Find("business_tutorialpage5").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("business_tutorialpage6").GetComponent<Canvas>().enabled = true;
+        }
+        if (tutorialStep == 7)
+        {
+            GameObject.Find("business_tutorialpage6").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("business_tutorialpage7").GetComponent<Canvas>().enabled = true;
+        }
+        if (tutorialStep == 8)
+        {
+            GameObject.Find("business_tutorialpage7").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("business_tutorialpage8").GetComponent<Canvas>().enabled = true;
+        }
+        if (tutorialStep == 9)
+        {
+            GameObject.Find("business_tutorialpage8").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("business_tutorialpage9").GetComponent<Canvas>().enabled = true;
+        }
+        if (tutorialStep == 10)
+        {
+            GameObject.Find("business_tutorialpage9").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("business_tutorialpage10").GetComponent<Canvas>().enabled = true;
+        }
+        if (tutorialStep == 11)
+        {
+            GameObject.Find("business_tutorialpage10").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("business_tutorialpage11").GetComponent<Canvas>().enabled = true;
+        }
+        if (tutorialStep == 12)
+        {
+            GameObject.Find("business_tutorialpage11").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("business_tutorialpage12").GetComponent<Canvas>().enabled = true;
+        }
+        if (tutorialStep == 13)
+        {
+            GameObject.Find("business_tutorialpage12").GetComponent<Canvas>().enabled = false;
+            GameObject.Find("business_tutorialpagelast").GetComponent<Canvas>().enabled = true;
+        }
     }
 
 }

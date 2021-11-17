@@ -206,10 +206,25 @@ public class BaseDeliveryInterface : MonoBehaviour
     protected double maxDeliveryWeight = 0;
 
     /// <summary>
+    /// 
+    /// tutorial step
+    /// 
+    /// </summary>
+    protected int tutorialStep = 0;
+
+
+    protected Dictionary<int, float[]> cachedOpen = new Dictionary<int, float[]>();
+
+
+    /// <summary>
     /// Unity start method and initializes the scene
     /// </summary>
     void Start()
     {
+
+        if (!Startup.tutorial)
+            tutorialStep = 100;
+
 
         Capture.Log("StartSession", business ? Capture.BUSINESS : Capture.PLANNER);
 
@@ -225,6 +240,9 @@ public class BaseDeliveryInterface : MonoBehaviour
         ResetView();
         // load all database objects
         DatabaseLoadAllObjects();
+
+        // toggle tutorial
+        toggleTutorial();
 
     }
 
@@ -286,6 +304,13 @@ public class BaseDeliveryInterface : MonoBehaviour
         GameObject.Find("East").transform.position = new Vector3(eastPosition.x * scaleSceneFactor / 2f, eastPosition.y, eastPosition.z);
         Vector3 westPosition = GameObject.Find("West").transform.position;
         GameObject.Find("West").transform.position = new Vector3(westPosition.x * scaleSceneFactor / 2f, westPosition.y, westPosition.z);
+
+        // add restriced airspace
+        float airspace_x = -3;
+        float airspace_z = 3;
+        float airspace_dia = 1.8f;
+        GameObject.Find("restrictedairspace").transform.position = new Vector3(scaleSceneFactor * airspace_x, 1, scaleSceneFactor*airspace_z);
+        GameObject.Find("restrictedairspace").transform.localScale = new Vector3(airspace_dia * scaleSceneFactor, 1f, airspace_dia* scaleSceneFactor);
 
     }
 
@@ -365,6 +390,16 @@ public class BaseDeliveryInterface : MonoBehaviour
     protected void RefreshPaths()
     {
 
+        // Calculates the resulting manual or AI based solutions. The ortools returns results 
+        // where if there is a time window, it says the the travel time is from 0 to 4, instead of 3.5 to 
+        // 4, which results in incorrect calculations, so just use the below to get the correct metrics
+        planCalculation = new PlanCalculation(plan, scaleSceneFactor, business);
+        planCalculation.calculate();
+        bool[] restricedAirSpace = planCalculation.getRestrictedAirSpace();
+        Dictionary<int, List<int>> restricedAirSpaceSegments = planCalculation.getRestrictedAirSpaceSegments();
+        planMetricsStr = planCalculation.getInfoString();
+        overbudget = planCalculation.getStartupCost() > budget;
+
         connectorMap.Clear();
 
         // remove all paths
@@ -386,36 +421,57 @@ public class BaseDeliveryInterface : MonoBehaviour
             float scalePath = 0.12f;
             if (selectedPathIndex == i)          
                 scalePath = 0.40f;
-            
+
+            Color pathColor = Color.white;
+            if (i == selectedPathIndex)
+                pathColor = Color.cyan;
+            if (restricedAirSpace[i])
+                pathColor = Color.red;
+
 
             // for each path segment not starting or ending at the warehouse
             for (int j = 1; j < plan.paths[i].customers.Count; j++)
             {
                 Address addressA = plan.paths[i].customers[j - 1].address;
                 Address addressB = plan.paths[i].customers[j].address;
-                GameObject obj = CreateCylinderBetweenPoints(ScaleInScene(new Vector3(addressA.x, 1, addressA.z)), ScaleInScene(new Vector3(addressB.x, 1, addressB.z)), scalePath, i == selectedPathIndex ? Color.cyan : Color.white, plan.paths[i].customers[j].deliverytime, "link");
+
+                if(restricedAirSpaceSegments.ContainsKey(i))
+                    if (!restricedAirSpaceSegments[i].Contains(j))
+                        pathColor = Color.cyan;
+                    else
+                        pathColor = Color.red;
+
+                GameObject obj = CreateCylinderBetweenPoints(ScaleInScene(new Vector3(addressA.x, 1, addressA.z)), ScaleInScene(new Vector3(addressB.x, 1, addressB.z)), scalePath, pathColor, plan.paths[i].customers[j].deliverytime, "link");
                 connectorMap[obj] = new Customer[] { plan.paths[i].customers[j - 1], plan.paths[i].customers[j] };
             }
 
             // get paths to and from warehouse
             if (plan.paths[i].customers.Count > 0)
             {
+
+                if (restricedAirSpaceSegments.ContainsKey(i))
+                    if (!restricedAirSpaceSegments[i].Contains(0))
+                        pathColor = Color.cyan;
+                    else
+                        pathColor = Color.red;
+
                 Address addressB = plan.paths[i].customers[0].address;
-                GameObject obj = CreateCylinderBetweenPoints(ScaleInScene(new Vector3(plan.paths[i].warehouse.address.x, 1, plan.paths[i].warehouse.address.z)), ScaleInScene(new Vector3(addressB.x, 1, addressB.z)), scalePath, i == selectedPathIndex ? Color.cyan : Color.white, plan.paths[i].customers[0].deliverytime, "link");
+                GameObject obj = CreateCylinderBetweenPoints(ScaleInScene(new Vector3(plan.paths[i].warehouse.address.x, 1, plan.paths[i].warehouse.address.z)), ScaleInScene(new Vector3(addressB.x, 1, addressB.z)), scalePath, pathColor, plan.paths[i].customers[0].deliverytime, "link");
                 connectorMap[obj] = new Customer[] { null, plan.paths[i].customers[0] };
+
+
+                if (restricedAirSpaceSegments.ContainsKey(i))
+                    if (!restricedAirSpaceSegments[i].Contains(plan.paths[i].customers.Count))
+                        pathColor = Color.cyan;
+                    else
+                        pathColor = Color.red;
+
                 Address addressA = plan.paths[i].customers[plan.paths[i].customers.Count - 1].address;
-                obj = CreateCylinderBetweenPoints(ScaleInScene(new Vector3(addressA.x, 1, addressA.z)), ScaleInScene(new Vector3(plan.paths[i].warehouse.address.x, 1, plan.paths[i].warehouse.address.z)), scalePath, i == selectedPathIndex ? Color.cyan : Color.white, 0.0f, "link");
+                obj = CreateCylinderBetweenPoints(ScaleInScene(new Vector3(addressA.x, 1, addressA.z)), ScaleInScene(new Vector3(plan.paths[i].warehouse.address.x, 1, plan.paths[i].warehouse.address.z)), scalePath, pathColor, 0.0f, "link");
                 connectorMap[obj] = new Customer[] { plan.paths[i].customers[plan.paths[i].customers.Count - 1], null };
             }
         }
 
-        // Calculates the resulting manual or AI based solutions. The ortools returns results 
-        // where if there is a time window, it says the the travel time is from 0 to 4, instead of 3.5 to 
-        // 4, which results in incorrect calculations, so just use the below to get the correct metrics
-        planCalculation = new PlanCalculation(plan, scaleSceneFactor, business);
-        planCalculation.calculate();
-        planMetricsStr = planCalculation.getInfoString();
-        overbudget = planCalculation.getStartupCost() > budget;
 
     }
 
@@ -849,7 +905,8 @@ public class BaseDeliveryInterface : MonoBehaviour
             {
                 if (connectorMap.ContainsKey(selectedObj))
                 {
-                    if(selectedObj.GetComponent<MeshRenderer>().material.color.Equals(Color.cyan)) // only use select path
+                    //if (selectedObj.GetComponent<MeshRenderer>().material.color.Equals(Color.cyan)) // only use select path
+                    if (selectedObj.transform.localScale.x == 0.4f)
                         return selectedObj;
                 }
             }
@@ -946,6 +1003,9 @@ public class BaseDeliveryInterface : MonoBehaviour
         // update calculations
         SetHouseAndLabelDisplay();
 
+        cachedOpen[plan.id] = new float[] { planCalculation.getProfit(), planCalculation.getStartupCost(), planCalculation.getCustomers() };
+        
+
     }
 
     /// <summary>
@@ -1017,6 +1077,12 @@ public class BaseDeliveryInterface : MonoBehaviour
                     // load the full plan
                     DataInterface.GetPlan(plan.id);
 
+                } else
+                {
+                    if (!loadedPlans[plan.id].plan.valid)
+                    {
+                        DataInterface.GetPlan(plan.id);
+                    }
                 }
 
             }
@@ -1035,11 +1101,15 @@ public class BaseDeliveryInterface : MonoBehaviour
 
             // gets the maximum delivery weight
             maxDeliveryWeight = 0;
-            for (int i = 0; i < scenario.customers.Count; i++)           
+            //int maxId = 0;
+            //int market = 0;
+            for (int i = 0; i < scenario.customers.Count; i++) {
                 maxDeliveryWeight = Math.Max(maxDeliveryWeight, scenario.customers[i].weight);
-            
+            }
+
             // add houses to the scene
             AddHouses();
+            toggleShock();
 
             RestWebService.scenarioqueue.Clear();
 
@@ -1067,14 +1137,17 @@ public class BaseDeliveryInterface : MonoBehaviour
             // for each vehicle in the queue
             foreach (Vehicle vehicle in vehiclequeue)
             {
-                // cost shock for vehicles
-                vehicle.cost = DesignerAssets.UAVDesigner.getShockCost(vehicle.cost, RestWebService.market);
-                teamVehicles.Add(vehicle);
+                if (vehicle.valid)
+                {
+                    // cost shock for vehicles
+                    vehicle.cost = DesignerAssets.UAVDesigner.getShockCost(vehicle.cost, RestWebService.market);
+                    teamVehicles.Add(vehicle);
 
-                maxVehicleCost = System.Math.Max(maxVehicleCost, vehicle.cost);
-                maxVehicleRange = System.Math.Max(maxVehicleRange, vehicle.range);
-                maxVehicleVelocity = System.Math.Max(maxVehicleVelocity, vehicle.velocity);
-                maxVehicleCapacity = System.Math.Max(maxVehicleCapacity, vehicle.payload);
+                    maxVehicleCost = System.Math.Max(maxVehicleCost, vehicle.cost);
+                    maxVehicleRange = System.Math.Max(maxVehicleRange, vehicle.range);
+                    maxVehicleVelocity = System.Math.Max(maxVehicleVelocity, vehicle.velocity);
+                    maxVehicleCapacity = System.Math.Max(maxVehicleCapacity, vehicle.payload);
+                }
             }
             RestWebService.vehiclequeue.Clear();
 
@@ -1129,6 +1202,8 @@ public class BaseDeliveryInterface : MonoBehaviour
             userSelectedPlan = null;
             ShowMsg("Plan opened : " + plan.tag, false);
 
+            checkOpenCache();
+
         }
 
         checkPopupCacheCustom();
@@ -1140,6 +1215,10 @@ public class BaseDeliveryInterface : MonoBehaviour
     /// </summary>
     protected virtual void checkPopupCacheCustom() { }
 
+    protected virtual void checkOpenCache() { }
+
+    protected virtual void toggleTutorial() { }
+
     /// <summary>
     /// gets the string representation of a plan for data logs
     /// </summary>
@@ -1147,6 +1226,14 @@ public class BaseDeliveryInterface : MonoBehaviour
     protected string toString()
     {
         return JsonConvert.SerializeObject(plan);
+    }
+
+    /// <summary>
+    /// Toggles the display of the restriced air space
+    /// </summary>
+    protected void toggleShock()
+    {
+        GameObject.Find("restrictedairspace").gameObject.GetComponent<MeshRenderer>().enabled = (RestWebService.market == 3);
     }
 
     /// <summary>

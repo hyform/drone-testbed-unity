@@ -17,7 +17,7 @@ true
 // - ai
 // - dronebot
 
-// Everything after the first 7 lines is ignored
+// Everything after the first 8 lines is ignored
 // so you can store notes and stuff down here
 
 // for isBusiness and logToServer, anything that's

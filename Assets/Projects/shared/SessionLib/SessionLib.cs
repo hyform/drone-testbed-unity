@@ -17,6 +17,9 @@ public class SessionLib : MonoBehaviour
     [DllImport("__Internal")]
     public static extern string GetIsAI();
 
+    [DllImport("__Internal")]
+    public static extern string GetIsTutorial();
+
     /// <summary>
     /// Gets a Unity web request
     /// </summary>
